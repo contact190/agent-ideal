@@ -222,6 +222,13 @@
     <div class="message-form" id="msgReglages"></div>
   </div>
 
+  <div class="etape">
+    <h3>🔄 Mise à jour <span class="pastille" id="pastilleVersion"></span></h3>
+    <div class="aide">Aussi possible depuis Telegram : envoie /majour (ou dis « mise à jour »).</div>
+    <div class="ligne"><button id="btnMajVerifier">Rechercher une mise à jour</button></div>
+    <div class="message-form" id="msgMaj"></div>
+  </div>
+
   <div class="boutons"><button id="btnFermerReglages">Fermer</button><button class="principal" id="btnSauverReglages">Enregistrer les préférences</button></div>
 </div></div>
 
@@ -332,6 +339,7 @@ function remplirReglages(r){
   $("telToutSuivre").checked = r.telegram_tout_suivre !== false;
   afficherTelegram(etat.telegram);
   afficherVocal(etat.vocal);
+  $("pastilleVersion").textContent = "version " + (etat.version || "inconnue");
 }
 async function rafraichir(premiere){
   etat = await api("/api/etat");
@@ -394,6 +402,24 @@ function afficherVocal(v){
 $("vocMode").onchange = async () => { const r = await api("/api/vocal", {mode: $("vocMode").value}); afficherVocal(r.vocal); };
 $("btnVocCle").onclick = async () => { const r = await api("/api/vocal", {cle_groq: $("vocCle").value.trim()}); $("vocCle").value=""; afficherVocal(r.vocal); };
 $("telToutSuivre").onchange = () => api("/api/reglages", {telegram_tout_suivre: $("telToutSuivre").checked});
+
+// ---------- mise à jour
+let majSha = "";
+$("btnMajVerifier").onclick = async () => {
+  const m = $("msgMaj"), b = $("btnMajVerifier");
+  if (majSha){
+    b.disabled = true; m.className = "message-form"; m.textContent = "Installation… l'agent va redémarrer et cette page se rechargera.";
+    const r = await api("/api/maj/installer", {sha: majSha});
+    if (!r.ok){ b.disabled = false; m.className = "message-form ko"; m.textContent = r.erreur; }
+    return;
+  }
+  m.className = "message-form"; m.textContent = "Recherche sur GitHub…";
+  const r = await api("/api/maj/verifier", {});
+  if (!r.ok){ m.className = "message-form ko"; m.textContent = r.erreur; return; }
+  if (!r.disponible){ m.className = "message-form ok"; m.textContent = `L'agent est à jour (version ${r.locale}).`; return; }
+  majSha = r.sha; b.textContent = "Installer la mise à jour"; b.className = "principal";
+  m.className = "message-form"; m.textContent = `Nouvelle version ${r.distante} (${r.date}) : ` + r.changements.join(" · ");
+};
 
 // ---------- réglages
 let dossiers = [];
@@ -554,6 +580,7 @@ function connecterFlux(){
       case "google": afficherGoogle(e.etat); break;
       case "nouvelle": ecranVide(); break;
       case "telegram": etat.telegram = e.etat; afficherTelegram(e.etat); break;
+      case "maj": ajouter("info", e.etape === "debut" ? "🔄 Mise à jour en cours…" : "♻️ Redémarrage de l'agent : la page va se recharger.", true); break;
       case "fin": definirEnCours(false); afficherTokens(e.tokens); break;
       case "routine_debut": ajouter("info", "🕗 Tâche « "+e.routine+" » démarrée", true); journalTache("▶ "+e.routine+" démarrée"); break;
       case "routine_fin":
@@ -568,7 +595,14 @@ function connecterFlux(){
       case "routine_erreur": journalTache("❌ " + e.texte); ajouter("erreur", "Tâche « "+e.routine+" » : "+e.texte, true); break;
     }
   };
-  src.onerror = () => { $("infoPied").textContent = "⚠️ Connexion perdue avec l'agent. Relance « Agent Idéal » si cela dure."; };
+  src.onerror = () => {
+    $("infoPied").textContent = "⚠️ Connexion perdue avec l'agent… nouvelle tentative.";
+    // après un redémarrage (mise à jour), l'agent revient avec un nouveau jeton : on recharge la page
+    src.close();
+    const essai = setInterval(async () => {
+      try { const r = await fetch("/ping", {cache:"no-store"}); if (r.ok){ clearInterval(essai); location.reload(); } } catch(e) {}
+    }, 2000);
+  };
   src.onopen = () => { $("infoPied").textContent = "Arrêt d'urgence : souris dans le coin en haut à gauche de l'écran."; };
 }
 

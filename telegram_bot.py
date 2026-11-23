@@ -32,6 +32,7 @@ COMMANDES = [
     {"command": "etat", "description": "Ce que fait l'agent"},
     {"command": "stop", "description": "Arrêter le travail en cours"},
     {"command": "nouvelle", "description": "Nouvelle conversation"},
+    {"command": "majour", "description": "Mettre l'agent à jour"},
     {"command": "aide", "description": "Aide"},
 ]
 
@@ -155,14 +156,17 @@ AIDE = (
     "📎 Et une photo ou un fichier : je le range sur le PC et je m'en sers.\n\n"
     "Les boutons en bas de l'écran te donnent les commandes rapides.\n\n"
     "Commandes :\n/ecran — capture de l'écran du PC\n/taches — tâches automatiques\n"
-    "/etat — ce que fait l'agent\n/stop — arrêter le travail en cours\n/nouvelle — nouvelle conversation\n/aide — ce message"
+    "/etat — ce que fait l'agent\n/stop — arrêter le travail en cours\n/nouvelle — nouvelle conversation\n"
+    "/majour — mettre l'agent à jour\n/aide — ce message"
 )
 
 
 # ================================================================ le bot
 
 class BotTelegram:
-    def __init__(self, bus, agent, planificateur, repondre_confirmation):
+    def __init__(self, bus, agent, planificateur, repondre_confirmation, installer_maj=None):
+        self.installer_maj = installer_maj          # fonction(sha, prevenir, origine) -> message d'erreur
+        self.message_au_demarrage = ""
         self.bus = bus
         self.agent = agent
         self.planificateur = planificateur
@@ -243,6 +247,9 @@ class BotTelegram:
             appel(self.jeton, "setMyCommands", {"commands": COMMANDES})
         except Exception:
             pass
+        if self.message_au_demarrage and self.chat_id:
+            self.envoyer(self.message_au_demarrage, clavier=True)
+            self.message_au_demarrage = ""
 
     # ---------------- envoi
 
@@ -425,6 +432,22 @@ class BotTelegram:
             if donnees.startswith("c:"):
                 _, id_conf, ok = donnees.split(":")
                 reponse = "C'est noté." if self.repondre_confirmation(id_conf, ok == "1") else "Cette demande n'est plus en attente."
+            elif donnees.startswith("m:"):
+                sha = donnees[2:]
+                try:
+                    appel(self.jeton, "editMessageReplyMarkup", {"chat_id": self.chat_id, "message_id": cq["message"]["message_id"],
+                                                                 "reply_markup": {"inline_keyboard": []}})
+                except Exception:
+                    pass
+                if sha == "non":
+                    reponse = "Mise à jour annulée."
+                elif self.installer_maj:
+                    reponse = "Installation lancée."
+                    def lancer():
+                        erreur = self.installer_maj(sha, lambda t: self.envoyer(html.escape(t)), "telegram")
+                        if erreur:
+                            self.envoyer("❌ " + html.escape(erreur))
+                    threading.Thread(target=lancer, daemon=True).start()
             elif donnees.startswith("l:"):
                 self.planificateur.lancer_maintenant(donnees[2:])
                 reponse = "Tâche lancée."
@@ -483,6 +506,8 @@ class BotTelegram:
         texte = (texte or "").strip()
         if texte in BOUTONS:
             texte = BOUTONS[texte]
+        if texte.lower().strip(" .!") in ("mise à jour", "mise a jour", "mets-toi à jour", "mets toi à jour", "update"):
+            texte = "/majour"
         if texte.startswith("/"):
             self._commande(texte.split()[0].split("@")[0].lower())
             return
@@ -520,7 +545,8 @@ class BotTelegram:
         # « stop », « écran »… dits à voix haute = commandes
         simple = re.sub(r"[^\w ]", "", texte.lower()).strip()
         dites = {"stop": "/stop", "arrête": "/stop", "arrete": "/stop", "écran": "/ecran", "ecran": "/ecran",
-                 "état": "/etat", "etat": "/etat", "tâches": "/taches", "taches": "/taches", "nouvelle conversation": "/nouvelle"}
+                 "état": "/etat", "etat": "/etat", "tâches": "/taches", "taches": "/taches", "nouvelle conversation": "/nouvelle",
+                 "mise à jour": "/majour", "mise a jour": "/majour", "mets toi à jour": "/majour", "metstoi à jour": "/majour"}
         self._executer_texte(dites.get(simple, texte))
 
     def _attend_reponse(self):
@@ -569,7 +595,9 @@ class BotTelegram:
         elif cmd == "/etat":
             pl = self.planificateur.etat()
             r_en_cours = routines.obtenir(pl["en_cours"]) if pl.get("en_cours") else None
-            lignes = [f"💬 Conversation : {'en cours de travail' if self.agent.en_cours else 'au repos'}",
+            import mise_a_jour
+            lignes = [f"🤖 Version : {mise_a_jour.version_locale()[:7] or 'inconnue'}",
+                      f"💬 Conversation : {'en cours de travail' if self.agent.en_cours else 'au repos'}",
                       f"🕗 Tâche automatique : {('« ' + r_en_cours['nom'] + ' » en cours') if r_en_cours else 'aucune en cours'}"]
             try:
                 import outils_google
@@ -578,6 +606,21 @@ class BotTelegram:
             except Exception:
                 pass
             self.envoyer("\n".join(html.escape(x) for x in lignes))
+        elif cmd == "/majour":
+            import mise_a_jour
+            try:
+                v = mise_a_jour.verifier()
+            except Exception as e:
+                self.envoyer(f"Impossible de joindre GitHub : {html.escape(str(e))}")
+                return
+            if not v["disponible"]:
+                self.envoyer(f"✅ L'agent est déjà à jour (version {v['locale']}).")
+                return
+            liste = "\n".join("• " + html.escape(c) for c in v["changements"]) or "• (détail indisponible)"
+            self.envoyer(f"🔄 <b>Nouvelle version disponible</b> ({v['distante']}, {v['date']})\n\n{liste}\n\n"
+                         f"Version installée : {v['locale']}. L'agent redémarrera tout seul (environ 1 minute).",
+                         boutons=[[{"text": "✅ Installer", "callback_data": f"m:{v['sha']}"},
+                                   {"text": "Plus tard", "callback_data": "m:non"}]])
         elif cmd == "/taches":
             rs = routines.lister()
             if not rs:

@@ -32,6 +32,7 @@ import navigateur
 import routines
 import telegram_bot
 import transcription
+import mise_a_jour
 from agent import Agent, Bus
 
 PORT_PREFERE = 8765
@@ -67,6 +68,7 @@ def etat_complet():
         "navigateurs": navigateur.disponibles(),
         "telegram": bot.etat() if bot else {},
         "vocal": transcription.etat(),
+        "version": mise_a_jour.version_locale()[:7] or "inconnue",
     }
 
 
@@ -110,6 +112,30 @@ def choisir_dossier() -> str:
         except Exception:
             pass
     return str(Path(chemin)) if chemin else ""
+
+
+_maj = {"en_cours": False}
+
+
+def installer_mise_a_jour(sha, prevenir=lambda t: None, origine="interface"):
+    """Installe la version `sha` puis redémarre l'agent. Renvoie un message d'erreur, ou ne revient pas."""
+    if _maj["en_cours"]:
+        return "Une mise à jour est déjà en cours."
+    if agent.en_cours or (planificateur and planificateur.etat().get("en_cours")):
+        return "L'agent est en train de travailler : attends la fin (ou /stop) puis relance la mise à jour."
+    _maj["en_cours"] = True
+    bus.publier({"type": "maj", "etape": "debut"})
+    try:
+        resume = mise_a_jour.appliquer(sha, prevenir)
+    except Exception as e:
+        _maj["en_cours"] = False
+        config.journal(f"Mise à jour échouée : {e}")
+        return f"La mise à jour a échoué : {e}"
+    prevenir(f"♻️ {resume}. Redémarrage de l'agent…")
+    bus.publier({"type": "maj", "etape": "redemarrage"})
+    time.sleep(1.5)
+    mise_a_jour.redemarrer({"version": sha[:7], "origine": origine,
+                            "chat_id": config.charger_reglages().get("telegram_chat_id")})
 
 
 def connecter_google():
@@ -284,6 +310,19 @@ class Gestionnaire(BaseHTTPRequestHandler):
                 if d.get(f"cle_{f}") is not None:
                     transcription.enregistrer_cle(f, d[f"cle_{f}"])
             return self._json({"ok": True, "vocal": transcription.etat()})
+        if chemin == "/api/maj/verifier":
+            try:
+                return self._json({"ok": True, **mise_a_jour.verifier()})
+            except Exception as e:
+                return self._json({"ok": False, "erreur": f"Impossible de joindre GitHub : {e}"})
+        if chemin == "/api/maj/installer":
+            sha = d.get("sha", "")
+            if not sha:
+                return self._json({"ok": False, "erreur": "Version manquante."})
+            erreur_maj = []
+            threading.Thread(target=lambda: erreur_maj.append(installer_mise_a_jour(sha, origine="interface")), daemon=True).start()
+            time.sleep(0.5)
+            return self._json({"ok": not erreur_maj, "erreur": erreur_maj[0] if erreur_maj else ""})
         if chemin == "/api/telegram/code":
             if not bot.jeton:
                 return self._json({"ok": False, "erreur": "Enregistre d'abord le jeton du bot."})
@@ -350,7 +389,17 @@ def _deja_lance():
 
 def main():
     global serveur
-    deja = _deja_lance()
+    apres_maj = "--apres-maj" in sys.argv
+    if apres_maj:
+        # l'ancienne version est en train de s'arrêter : on attend que son port se libère
+        for _ in range(40):
+            with socket.socket() as s_:
+                try:
+                    s_.bind(("127.0.0.1", PORT_PREFERE))
+                    break
+                except OSError:
+                    time.sleep(0.5)
+    deja = None if apres_maj else _deja_lance()
     if deja:
         navigateur.ouvrir(deja)
         return
@@ -358,7 +407,11 @@ def main():
     planificateur = routines.Planificateur(bus)
     module_agent.PLANIFICATEUR = planificateur
     global bot
-    bot = telegram_bot.BotTelegram(bus, agent, planificateur, repondre_confirmation)
+    bot = telegram_bot.BotTelegram(bus, agent, planificateur, repondre_confirmation, installer_mise_a_jour)
+    signal = mise_a_jour.lire_signal()
+    if signal:
+        bot.message_au_demarrage = (f"✅ <b>Agent mis à jour</b> (version {signal.get('version', '?')}) et redémarré. "
+                                    "Il est prêt.")
     bot.demarrer()
     port = _port_libre()
     serveur = ThreadingHTTPServer(("127.0.0.1", port), Gestionnaire)

@@ -93,7 +93,11 @@ Ensuite, sur Telegram :
 
 ## 🔄 Mise à jour
 
-Double-clique sur **`4_METTRE_A_JOUR.bat`** dans le dossier de l'agent. Tes réglages, ta clé et tes tâches sont conservés.
+- **Depuis le téléphone** : envoie **/majour** au bot Telegram (ou dis « mise à jour » en vocal). L'agent te montre les nouveautés, tu appuies sur **✅ Installer**, et il se met à jour puis redémarre tout seul.
+- **Depuis le PC** : ⚙ Réglages → **Rechercher une mise à jour**.
+- **En secours** : double-clique sur **`4_METTRE_A_JOUR.bat`**.
+
+Tes réglages, ta clé et tes tâches sont toujours conservés.
 
 ## 🆘 En cas de problème
 
