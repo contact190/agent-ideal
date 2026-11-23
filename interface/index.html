@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Idéal</title>
+<style>
+  :root{
+    --fond:#f4f6f9; --carte:#ffffff; --texte:#1b2430; --doux:#66707d; --bord:#e2e6ec;
+    --bleu:#1f4e78; --bleu-clair:#e8f0f8; --vert:#1e7d4f; --rouge:#b3261e; --ambre:#9a6200; --ambre-fond:#fff4dc;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--texte);background:var(--fond);font-size:15px}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--bord);background:var(--carte);padding:8px 14px;color:var(--texte)}
+  button.principal{background:var(--bleu);border-color:var(--bleu);color:#fff;font-weight:600}
+  button.danger{color:var(--rouge);border-color:#e9b7b3}
+  button:disabled{opacity:.5;cursor:default}
+  input,textarea,select{font:inherit;border:1px solid var(--bord);border-radius:8px;padding:9px 11px;width:100%;background:#fff;color:var(--texte)}
+  label{font-weight:600;font-size:13px;display:block;margin:14px 0 6px}
+  .aide{color:var(--doux);font-size:13px;margin-top:5px;line-height:1.4}
+  .app{display:flex;flex-direction:column;height:100%}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--bleu);color:#fff}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .etat{font-size:12.5px;opacity:.85;margin-left:6px}
+  header .espace{flex:1}
+  header button{background:transparent;border-color:rgba(255,255,255,.35);color:#fff;padding:6px 12px}
+  .bandeau{display:none;padding:10px 18px;background:var(--ambre-fond);color:var(--ambre);border-bottom:1px solid #f0dca8;align-items:center;gap:12px;font-size:14px}
+  .bandeau.visible{display:flex}
+  .bandeau span{flex:1}
+  main{flex:1;overflow-y:auto;padding:22px 18px 10px}
+  .fil{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+  .bulle{padding:11px 15px;border-radius:12px;line-height:1.5;max-width:88%;white-space:normal;word-wrap:break-word}
+  .bulle.user{align-self:flex-end;background:var(--bleu);color:#fff;border-bottom-right-radius:4px;white-space:pre-wrap}
+  .bulle.assistant{align-self:flex-start;background:var(--carte);border:1px solid var(--bord);border-bottom-left-radius:4px}
+  .bulle.assistant p{margin:0 0 8px}.bulle.assistant p:last-child{margin:0}
+  .bulle.assistant ul,.bulle.assistant ol{margin:4px 0 8px;padding-left:22px}
+  .bulle.assistant code{background:#f0f2f5;padding:1px 5px;border-radius:4px;font-size:13.5px}
+  .bulle.assistant a{color:var(--bleu)}
+  .action{align-self:flex-start;font-size:13px;color:var(--doux);padding:2px 4px}
+  .action b{font-weight:600;color:#47515e}
+  .info{align-self:center;font-size:13px;color:var(--doux);background:#eceff3;border-radius:20px;padding:5px 12px}
+  .erreur{align-self:stretch;background:#fdecea;color:var(--rouge);border:1px solid #f3c2bd;border-radius:10px;padding:10px 14px;font-size:14px}
+  .reflexion{align-self:flex-start;color:var(--doux);font-size:13px;display:flex;gap:6px;align-items:center}
+  .points span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#9aa4b1;margin-right:3px;animation:p 1.2s infinite}
+  .points span:nth-child(2){animation-delay:.2s}.points span:nth-child(3){animation-delay:.4s}
+  @keyframes p{0%,80%,100%{opacity:.25}40%{opacity:1}}
+  .vide{max-width:620px;margin:8vh auto 0;text-align:center;color:var(--doux)}
+  .vide h2{color:var(--texte);font-weight:600;margin-bottom:6px}
+  .exemples{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px;text-align:left}
+  .exemples button{text-align:left;padding:12px 14px;line-height:1.4;font-size:14px}
+  footer{padding:10px 18px 14px;background:var(--fond)}
+  .saisie{max-width:860px;margin:0 auto;display:flex;gap:8px;align-items:flex-end;background:var(--carte);border:1px solid var(--bord);border-radius:12px;padding:8px}
+  .saisie textarea{border:none;resize:none;max-height:200px;min-height:24px;padding:6px 8px;outline:none}
+  .pied{max-width:860px;margin:6px auto 0;font-size:12px;color:var(--doux);display:flex;justify-content:space-between}
+  .voile{position:fixed;inset:0;background:rgba(20,28,40,.45);display:none;align-items:center;justify-content:center;z-index:10;padding:18px}
+  .voile.visible{display:flex}
+  .fenetre{background:var(--carte);border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:22px 24px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+  .fenetre h2{margin:0 0 4px;font-size:19px}
+  .fenetre .boutons{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+  .details{white-space:pre-wrap;background:#f6f7f9;border:1px solid var(--bord);border-radius:8px;padding:12px;font-size:13.5px;max-height:320px;overflow:auto;margin-top:12px}
+  .etape{border:1px solid var(--bord);border-radius:10px;padding:14px 16px;margin-top:14px}
+  .etape h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
+  .pastille{font-size:12px;padding:2px 9px;border-radius:20px;background:#eceff3;color:var(--doux);font-weight:600}
+  .pastille.ok{background:#e3f3ea;color:var(--vert)}
+  .pastille.ko{background:var(--ambre-fond);color:var(--ambre)}
+  .ligne{display:flex;gap:8px;margin-top:8px}
+  .message-form{font-size:13px;margin-top:6px}
+  .message-form.ko{color:var(--rouge)}.message-form.ok{color:var(--vert)}
+  .interrupteur{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px}
+  .interrupteur input{width:auto}
+  .routine{border:1px solid var(--bord);border-radius:10px;padding:12px 14px;margin-top:12px}
+  .routine .tete{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .routine .tete b{flex:1;font-size:15px}
+  .routine .petit{font-size:13px;color:var(--doux);margin-top:4px;line-height:1.45}
+  .routine .consigne{font-size:13.5px;margin-top:8px;white-space:pre-wrap;background:#f6f7f9;border-radius:8px;padding:8px 10px;max-height:110px;overflow:auto}
+  .routine .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .routine .actions button{padding:6px 11px;font-size:13px}
+  .journal-direct{font-size:12.5px;color:var(--doux);background:#f6f7f9;border-radius:8px;padding:8px 10px;margin-top:10px;max-height:150px;overflow:auto;display:none}
+  .jours{display:flex;gap:6px;flex-wrap:wrap}.jours label{font-weight:400;margin:0;display:flex;gap:4px;align-items:center}.jours input{width:auto}
+  .onglets{display:flex;gap:8px;margin-top:12px}.onglets button.actif{background:var(--bleu-clair);border-color:var(--bleu);color:var(--bleu);font-weight:600}
+  @media (max-width:640px){.exemples{grid-template-columns:1fr}.bulle{max-width:96%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Agent Idéal</h1><span class="etat" id="etatHaut"></span>
+    <div class="espace"></div>
+    <button id="btnNouvelle" title="Nouvelle conversation">＋ Nouvelle</button>
+    <button id="btnTaches">🕗 Tâches</button>
+    <button id="btnReglages">⚙ Réglages</button>
+    <button id="btnQuitter" title="Arrêter l'agent">⏻</button>
+  </header>
+  <div class="bandeau" id="bandeauGoogle"><span id="bandeauTexte"></span><button class="principal" id="btnReconnecter">Reconnecter Google</button></div>
+  <main id="zone"><div class="fil" id="fil"></div></main>
+  <footer>
+    <div class="saisie">
+      <textarea id="texte" rows="1" placeholder="Demande quelque chose à l'agent… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"></textarea>
+      <button class="principal" id="btnEnvoyer">Envoyer</button>
+      <button class="danger" id="btnStop" style="display:none">■ Stop</button>
+    </div>
+    <div class="pied"><span id="infoPied">Arrêt d'urgence : souris dans le coin en haut à gauche de l'écran.</span><span id="tokens"></span></div>
+  </footer>
+</div>
+
+<!-- Confirmation d'une action sensible -->
+<div class="voile" id="voileConf"><div class="fenetre">
+  <h2 id="confTitre"></h2>
+  <div class="aide">L'agent attend ta validation avant de continuer.</div>
+  <div class="details" id="confDetails"></div>
+  <div class="boutons"><button id="confNon">Refuser</button><button class="principal" id="confOui">Valider</button></div>
+</div></div>
+
+<!-- Tâches planifiées -->
+<div class="voile" id="voileTaches"><div class="fenetre" style="max-width:680px">
+  <h2>Tâches automatiques</h2>
+  <div class="aide">L'agent les exécute seul aux heures prévues, tant que l'ordinateur est allumé (il démarre avec Windows).
+    Le plus simple : demande-le dans la discussion, par ex. « Chaque matin à 8 h, vérifie les commandes en attente et envoie-moi un rapport ».</div>
+  <div class="onglets"><button id="ongletListe" class="actif">Tâches</button><button id="ongletHisto">Historique</button><button id="ongletNouvelle">＋ Nouvelle tâche</button></div>
+  <div id="journalDirect" class="journal-direct"></div>
+  <div id="vueListe"></div>
+  <div id="vueHisto" style="display:none"></div>
+  <div id="vueForm" style="display:none">
+    <input type="hidden" id="tId">
+    <label>Nom</label><input id="tNom" placeholder="ex. Rapport commandes du matin">
+    <label>Consigne (ce que l'agent doit faire, en détail)</label>
+    <textarea id="tConsigne" rows="6" placeholder="ex. Ouvre le Google Sheet « Suivi chantiers », repère les poses prévues aujourd'hui et celles en retard, puis envoie-moi un rapport par e-mail à moi@monentreprise.com."></textarea>
+    <label>Heures (séparées par des virgules)</label><input id="tHeures" placeholder="08:00, 17:30">
+    <label>Jours</label>
+    <div class="jours" id="tJours"></div>
+    <label>Adresses e-mail autorisées sans validation (virgules ; « @domaine.com » pour tout un domaine)</label>
+    <input id="tEmails" placeholder="moi@monentreprise.com, @fournisseur.com">
+    <div class="interrupteur"><input type="checkbox" id="tCommandes"><span>Commandes Windows sans validation</span></div>
+    <div class="interrupteur"><input type="checkbox" id="tSuppr"><span>Suppressions (corbeille de l'agent) sans validation</span></div>
+    <div class="message-form" id="tMsg"></div>
+    <div class="boutons"><button id="tAnnuler">Annuler</button><button class="principal" id="tSauver">Enregistrer la tâche</button></div>
+  </div>
+  <div class="boutons"><button id="btnFermerTaches">Fermer</button></div>
+</div></div>
+
+<!-- Réglages / première configuration -->
+<div class="voile" id="voileReglages"><div class="fenetre">
+  <h2 id="titreReglages">Réglages</h2>
+  <div class="aide" id="introReglages"></div>
+
+  <div class="etape">
+    <h3>1. Clé API Claude <span class="pastille" id="pastilleCle"></span></h3>
+    <div class="aide">À créer sur console.anthropic.com → API Keys (avec du crédit dans Billing). Elle est rangée dans le coffre-fort de Windows.</div>
+    <div class="ligne"><input id="cle" type="password" placeholder="sk-ant-…" autocomplete="off"><button class="principal" id="btnCle">Enregistrer</button></div>
+    <div class="message-form" id="msgCle"></div>
+  </div>
+
+  <div class="etape">
+    <h3>2. Compte Google <span class="pastille" id="pastilleGoogle"></span></h3>
+    <div class="aide" id="infoGoogle">Drive, Sheets, Docs, Gmail et Agenda. Une page Google s'ouvre : choisis ton compte et accepte.</div>
+    <div class="ligne"><button class="principal" id="btnGoogle">Connecter Google</button><button id="btnGoogleOff" class="danger" style="display:none">Déconnecter</button></div>
+    <div class="message-form" id="msgGoogle"></div>
+  </div>
+
+  <div class="etape">
+    <h3>3. Préférences</h3>
+    <label>Ton prénom</label><input id="nom" placeholder="ex. Karim">
+    <label>Entreprise</label><input id="entreprise">
+    <label>Modèle Claude</label>
+    <select id="modele">
+      <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — rapide, conseillé</option>
+      <option value="claude-opus-5-5">Claude Opus 5.5 — le plus capable, plus cher</option>
+      <option value="claude-haiku-5-5">Claude Haiku 5.5 — le plus économique</option>
+    </select>
+    <label>Dossiers autorisés (un par ligne)</label>
+    <textarea id="dossiers" rows="4"></textarea>
+    <div class="aide">L'agent ne peut lire et écrire que dans ces dossiers.</div>
+    <div class="interrupteur"><input type="checkbox" id="ecran"><span>Contrôle de l'écran (souris et clavier) pour piloter les logiciels</span></div>
+    <div class="interrupteur"><input type="checkbox" id="commandes"><span>Commandes Windows (chaque commande est validée par toi)</span></div>
+    <div class="interrupteur"><input type="checkbox" id="modeTest"><span>Application Google en mode test (rappel de reconnexion tous les 7 jours)</span></div>
+    <label>Logiciels métier (un par ligne : Nom | adresse | description)</label>
+    <textarea id="applications" rows="3"></textarea>
+    <label>Consignes permanentes pour l'agent</label>
+    <textarea id="consignes" rows="3" placeholder="ex. Toujours ranger les devis dans Documents\\Clients. TVA 19 %."></textarea>
+    <div class="message-form" id="msgReglages"></div>
+  </div>
+
+  <div class="boutons"><button id="btnFermerReglages">Fermer</button><button class="principal" id="btnSauverReglages">Enregistrer les préférences</button></div>
+</div></div>
+
+<script>
+const JETON = "__JETON__";
+const $ = id => document.getElementById(id);
+let etat = null, enCours = false, elReflexion = null, confActuelle = null;
+
+async function api(chemin, donnees){
+  const opts = {headers:{"X-Jeton":JETON}};
+  if (donnees !== undefined){ opts.method="POST"; opts.headers["Content-Type"]="application/json"; opts.body=JSON.stringify(donnees); }
+  const r = await fetch(chemin, opts);
+  return r.json();
+}
+
+// ---------- rendu du texte (markdown simple, sûr)
+function echapper(t){ return t.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function enLigne(t){
+  t = echapper(t);
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t = t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  return t;
+}
+function markdown(texte){
+  const lignes = texte.split("\n"); let html = "", liste = null, para = [];
+  const fermerPara = () => { if (para.length){ html += "<p>"+para.map(enLigne).join("<br>")+"</p>"; para=[]; } };
+  const fermerListe = () => { if (liste){ html += `</${liste}>`; liste=null; } };
+  for (const l of lignes){
+    let m;
+    if ((m = l.match(/^\s*[-*•]\s+(.*)/))){ fermerPara(); if (liste!=="ul"){ fermerListe(); html+="<ul>"; liste="ul"; } html += "<li>"+enLigne(m[1])+"</li>"; }
+    else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))){ fermerPara(); if (liste!=="ol"){ fermerListe(); html+="<ol>"; liste="ol"; } html += "<li>"+enLigne(m[1])+"</li>"; }
+    else if ((m = l.match(/^#{1,4}\s+(.*)/))){ fermerPara(); fermerListe(); html += "<p><b>"+enLigne(m[1])+"</b></p>"; }
+    else if (!l.trim()){ fermerPara(); fermerListe(); }
+    else { fermerListe(); para.push(l); }
+  }
+  fermerPara(); fermerListe(); return html;
+}
+
+// ---------- fil de discussion
+function enBas(){ const z=$("zone"); z.scrollTop = z.scrollHeight; }
+function retirerVide(){ const v=document.querySelector(".vide"); if (v) v.remove(); }
+function ajouter(classe, html, brut){
+  retirerVide(); retirerReflexion();
+  const d = document.createElement("div"); d.className = classe;
+  if (brut) d.textContent = html; else d.innerHTML = html;
+  $("fil").appendChild(d); enBas(); return d;
+}
+function retirerReflexion(){ if (elReflexion){ elReflexion.remove(); elReflexion=null; } }
+function montrerReflexion(){
+  retirerReflexion();
+  elReflexion = document.createElement("div"); elReflexion.className="reflexion";
+  elReflexion.innerHTML = '<span class="points"><span></span><span></span><span></span></span> L\'agent travaille…';
+  $("fil").appendChild(elReflexion); enBas();
+}
+function ecranVide(){
+  $("fil").innerHTML = "";
+  const prenom = etat?.reglages?.nom_utilisateur;
+  const exemples = [
+    "Range les fichiers de mon Bureau par type dans des dossiers",
+    "Fais un devis Excel pour 4 fenêtres coulissantes 120×100 à 38 000 DA, avec TVA 19 %",
+    "Résume mes e-mails non lus de la semaine",
+    "Quels sont mes rendez-vous de la semaine prochaine ?",
+    "Chaque matin à 8 h, envoie-moi un résumé de mes e-mails et de mon agenda",
+    "Lis le rapport de visite dans Documents et fais-en un compte-rendu Word propre"];
+  const v = document.createElement("div"); v.className="vide";
+  v.innerHTML = `<h2>Bonjour${prenom ? " "+echapper(prenom) : ""} 👋</h2><div>Dis-moi ce que tu veux faire : je travaille directement sur ton ordinateur et ton compte Google.</div><div class="exemples"></div>`;
+  for (const e of exemples){ const b=document.createElement("button"); b.textContent=e; b.onclick=()=>{ $("texte").value=e; $("texte").focus(); ajusterSaisie(); }; v.querySelector(".exemples").appendChild(b); }
+  $("fil").appendChild(v);
+}
+function afficherFil(fil){
+  if (!fil || !fil.length){ ecranVide(); return; }
+  $("fil").innerHTML="";
+  for (const m of fil){ m.role==="user" ? ajouter("bulle user", m.texte, true) : ajouter("bulle assistant", markdown(m.texte)); }
+}
+
+// ---------- état général
+function nombre(n){ return (n||0).toLocaleString("fr-FR"); }
+function afficherTokens(t){ if (!t) return; $("tokens").textContent = `Tokens : ${nombre(t.entree + t.cache_lu + t.cache_ecrit)} lus · ${nombre(t.sortie)} écrits`; }
+function definirEnCours(v){
+  enCours = v; $("btnEnvoyer").style.display = v ? "none" : ""; $("btnStop").style.display = v ? "" : "none";
+  $("btnNouvelle").disabled = v;
+  if (!v) retirerReflexion();
+}
+function afficherGoogle(g, connexion){
+  const b = $("bandeauGoogle");
+  if (g && g.alerte){ $("bandeauTexte").textContent = g.message; b.classList.add("visible"); } else b.classList.remove("visible");
+  const p = $("pastilleGoogle");
+  if (connexion && connexion.en_cours){ p.className="pastille"; p.textContent="connexion…"; $("msgGoogle").className="message-form"; $("msgGoogle").textContent="Termine la connexion dans la page Google qui vient de s'ouvrir."; }
+  else if (g && g.connecte){ p.className="pastille ok"; p.textContent="connecté"; $("msgGoogle").className="message-form ok";
+    $("msgGoogle").textContent = (g.email||"") + (g.expire_dans_jours!=null ? ` — reconnexion dans ${g.expire_dans_jours} j` : ""); }
+  else { p.className="pastille ko"; p.textContent="à faire"; $("msgGoogle").className = "message-form" + (connexion && connexion.erreur ? " ko" : "");
+    $("msgGoogle").textContent = (connexion && connexion.erreur) || (g && g.message) || ""; }
+  $("btnGoogle").textContent = g && g.connecte ? "Reconnecter Google" : "Connecter Google";
+  $("btnGoogleOff").style.display = g && g.connecte ? "" : "none";
+  $("etatHaut").textContent = g && g.connecte ? "· " + (g.email||"Google connecté") : "· Google non connecté";
+}
+function remplirReglages(r){
+  $("nom").value = r.nom_utilisateur||""; $("entreprise").value = r.entreprise||"";
+  $("modele").value = r.modele; $("dossiers").value = (r.dossiers_autorises||[]).join("\n");
+  $("ecran").checked = !!r.ecran_actif; $("commandes").checked = !!r.commandes_actives; $("modeTest").checked = !!r.google_mode_test;
+  $("applications").value = (r.applications||[]).map(a => [a.nom, a.adresse, a.description||""].join(" | ")).join("\n");
+  $("consignes").value = r.consignes||"";
+}
+async function rafraichir(premiere){
+  etat = await api("/api/etat");
+  const c = $("pastilleCle"); c.className = "pastille " + (etat.cle_ok ? "ok":"ko"); c.textContent = etat.cle_ok ? "enregistrée" : "à faire";
+  $("cle").placeholder = etat.cle_ok ? "•••••••• (enregistrée — colle une nouvelle clé pour la changer)" : "sk-ant-…";
+  afficherGoogle(etat.google, etat.google_connexion);
+  afficherTokens(etat.tokens);
+  if (premiere){
+    remplirReglages(etat.reglages); afficherFil(etat.fil); definirEnCours(etat.en_cours);
+    if (etat.en_cours) montrerReflexion();
+    if (!etat.cle_ok || !etat.google.connecte){ ouvrirReglages(true); }
+  }
+}
+
+// ---------- réglages
+function ouvrirReglages(accueil){
+  $("titreReglages").textContent = accueil ? "Bienvenue ! Configurons l'agent" : "Réglages";
+  $("introReglages").textContent = accueil ? "Deux étapes rapides, à faire une seule fois." : "";
+  remplirReglages(etat.reglages); $("voileReglages").classList.add("visible");
+}
+$("btnReglages").onclick = () => ouvrirReglages(false);
+$("btnFermerReglages").onclick = () => $("voileReglages").classList.remove("visible");
+$("btnCle").onclick = async () => {
+  const cle = $("cle").value.trim(); const m = $("msgCle");
+  if (!cle){ m.className="message-form ko"; m.textContent="Colle ta clé d'abord."; return; }
+  m.className="message-form"; m.textContent="Vérification de la clé…"; $("btnCle").disabled=true;
+  const r = await api("/api/cle", {cle}); $("btnCle").disabled=false;
+  if (r.ok){ m.className="message-form ok"; m.textContent="✅ Clé valide et enregistrée."; $("cle").value=""; } else { m.className="message-form ko"; m.textContent=r.erreur; }
+  rafraichir();
+};
+$("btnGoogle").onclick = async () => { await api("/api/google/connecter", {}); afficherGoogle(etat.google, {en_cours:true}); suivreGoogle(); };
+$("btnReconnecter").onclick = $("btnGoogle").onclick;
+$("btnGoogleOff").onclick = async () => { if (confirm("Déconnecter le compte Google de l'agent ?")){ await api("/api/google/deconnecter", {}); rafraichir(); } };
+function suivreGoogle(){ const t = setInterval(async () => { await rafraichir(); if (!etat.google_connexion.en_cours) clearInterval(t); }, 1500); }
+$("btnSauverReglages").onclick = async () => {
+  const applications = $("applications").value.split("\n").map(l => l.split("|").map(x=>x.trim())).filter(p => p[0] && p[1])
+    .map(p => ({nom:p[0], adresse:p[1], description:p[2]||""}));
+  const r = await api("/api/reglages", {
+    nom_utilisateur:$("nom").value.trim(), entreprise:$("entreprise").value.trim(), modele:$("modele").value,
+    dossiers_autorises:$("dossiers").value.split("\n"), ecran_actif:$("ecran").checked, commandes_actives:$("commandes").checked,
+    google_mode_test:$("modeTest").checked, applications, consignes:$("consignes").value.trim()});
+  const m = $("msgReglages"); m.className="message-form ok"; m.textContent="✅ Préférences enregistrées.";
+  etat.reglages = r.reglages; remplirReglages(r.reglages); rafraichir();
+};
+
+// ---------- envoi
+function ajusterSaisie(){ const t=$("texte"); t.style.height="auto"; t.style.height=Math.min(t.scrollHeight,200)+"px"; }
+$("texte").addEventListener("input", ajusterSaisie);
+$("texte").addEventListener("keydown", e => { if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); envoyer(); } });
+$("btnEnvoyer").onclick = envoyer;
+async function envoyer(){
+  const texte = $("texte").value.trim(); if (!texte || enCours) return;
+  const r = await api("/api/message", {texte});
+  if (!r.ok){ ajouter("erreur", r.erreur || "Impossible d'envoyer.", true); if (!etat.cle_ok) ouvrirReglages(true); return; }
+  $("texte").value=""; ajusterSaisie();
+}
+$("btnStop").onclick = () => api("/api/stop", {});
+$("btnQuitter").onclick = async () => {
+  if (!confirm("Arrêter complètement l'Agent Idéal ? (Relance-le avec l'icône du Bureau.)")) return;
+  await api("/api/quitter", {}); document.body.innerHTML = '<div class="vide"><h2>Agent arrêté</h2><div>Tu peux fermer cet onglet.</div></div>';
+};
+$("btnNouvelle").onclick = async () => { const r = await api("/api/nouvelle", {}); if (r.ok) ecranVide(); };
+
+// ---------- tâches automatiques
+const NOMS_JOURS = ["lun","mar","mer","jeu","ven","sam","dim"];
+$("tJours").innerHTML = NOMS_JOURS.map((j,i)=>`<label><input type="checkbox" value="${i+1}" checked>${j}</label>`).join("");
+let routinesCache = [];
+function vue(nom){
+  for (const [v,o] of [["vueListe","ongletListe"],["vueHisto","ongletHisto"],["vueForm","ongletNouvelle"]]){
+    $(v).style.display = v===nom ? "" : "none"; $(o).classList.toggle("actif", v===nom);
+  }
+}
+async function chargerTaches(){
+  const d = await api("/api/routines"); routinesCache = d.routines;
+  const enCoursId = d.planificateur && d.planificateur.en_cours;
+  $("vueListe").innerHTML = d.routines.length ? "" : '<div class="aide" style="margin-top:14px">Aucune tâche pour l\'instant.</div>';
+  for (const r of d.routines){
+    const el = document.createElement("div"); el.className="routine";
+    const statut = enCoursId===r.id ? '<span class="pastille">en cours…</span>' : (r.actif===false ? '<span class="pastille ko">en pause</span>' : '<span class="pastille ok">active</span>');
+    const dernier = r.dernier_statut ? `<div class="petit">Dernière exécution : ${echapper((r.derniere_execution||"").replace("T"," ").slice(0,16))} — <b>${echapper(r.dernier_statut)}</b><br>${echapper((r.dernier_resultat||"").slice(0,300))}</div>` : "";
+    const em = (r.autorisations?.emails_autorises||[]).join(", ") || "aucune (validation demandée)";
+    el.innerHTML = `<div class="tete"><b>${echapper(r.nom)}</b>${statut}</div>
+      <div class="petit">${echapper(r.horaire)}${r.prochaine ? " · prochaine : "+echapper(r.prochaine) : ""}<br>E-mails autorisés : ${echapper(em)}</div>
+      <div class="consigne">${echapper(r.consigne)}</div>${dernier}
+      <div class="actions"><button data-a="lancer">▶ Lancer maintenant</button><button data-a="modifier">Modifier</button>
+      <button data-a="pause">${r.actif===false ? "Réactiver" : "Mettre en pause"}</button><button data-a="suppr" class="danger">Supprimer</button></div>`;
+    el.querySelector('[data-a="lancer"]').onclick = async () => { await api("/api/routines/lancer",{id:r.id}); $("journalDirect").style.display="block"; $("journalDirect").textContent="Démarrage de « "+r.nom+" »…\n"; setTimeout(chargerTaches, 800); };
+    el.querySelector('[data-a="modifier"]').onclick = () => remplirForm(r);
+    el.querySelector('[data-a="pause"]').onclick = async () => { await api("/api/routines/enregistrer",{id:r.id, actif: r.actif===false}); chargerTaches(); };
+    el.querySelector('[data-a="suppr"]').onclick = async () => { if (confirm("Supprimer la tâche « "+r.nom+" » ?")){ await api("/api/routines/supprimer",{id:r.id}); chargerTaches(); } };
+    $("vueListe").appendChild(el);
+  }
+  $("vueHisto").innerHTML = d.historique.length ? "" : '<div class="aide" style="margin-top:14px">Aucune exécution pour l\'instant.</div>';
+  for (const h of d.historique){
+    const el = document.createElement("div"); el.className="routine";
+    el.innerHTML = `<div class="tete"><b>${echapper(h.routine)}</b><span class="pastille ${h.statut==="réussie"?"ok":"ko"}">${echapper(h.statut)}</span></div>
+      <div class="petit">${echapper(h.debut.replace("T"," ").slice(0,16))} · ${h.duree_s} s</div><div class="consigne">${echapper(h.resultat||"")}</div>`;
+    $("vueHisto").appendChild(el);
+  }
+}
+function remplirForm(r){
+  $("tId").value = r?.id||""; $("tNom").value = r?.nom||""; $("tConsigne").value = r?.consigne||"";
+  $("tHeures").value = (r?.heures||["08:00"]).join(", ");
+  const jours = r?.jours || [1,2,3,4,5,6,7];
+  $("tJours").querySelectorAll("input").forEach(c => c.checked = jours.includes(+c.value));
+  $("tEmails").value = (r?.autorisations?.emails_autorises||[]).join(", ");
+  $("tCommandes").checked = !!r?.autorisations?.commandes; $("tSuppr").checked = !!r?.autorisations?.suppressions;
+  $("tMsg").textContent = ""; vue("vueForm");
+}
+$("btnTaches").onclick = () => { vue("vueListe"); chargerTaches(); $("voileTaches").classList.add("visible"); };
+$("btnFermerTaches").onclick = () => $("voileTaches").classList.remove("visible");
+$("ongletListe").onclick = () => { vue("vueListe"); chargerTaches(); };
+$("ongletHisto").onclick = () => { vue("vueHisto"); chargerTaches(); };
+$("ongletNouvelle").onclick = () => remplirForm(null);
+$("tAnnuler").onclick = () => vue("vueListe");
+$("tSauver").onclick = async () => {
+  const donnees = {nom:$("tNom").value.trim(), consigne:$("tConsigne").value.trim(), heures:$("tHeures").value,
+    jours:[...$("tJours").querySelectorAll("input:checked")].map(c=>+c.value), emails_autorises:$("tEmails").value,
+    commandes:$("tCommandes").checked, suppressions:$("tSuppr").checked};
+  if ($("tId").value) donnees.id = $("tId").value;
+  const r = await api("/api/routines/enregistrer", donnees);
+  if (r.ok){ vue("vueListe"); chargerTaches(); } else { $("tMsg").className="message-form ko"; $("tMsg").textContent = r.erreur; }
+};
+function journalTache(t){ const j=$("journalDirect"); j.style.display="block"; j.textContent += t+"\n"; j.scrollTop=j.scrollHeight; }
+
+// ---------- confirmation
+function ouvrirConfirmation(e){
+  confActuelle = e.id; $("confTitre").textContent = e.titre; $("confDetails").textContent = e.details;
+  $("voileConf").classList.add("visible");
+  if (document.hidden && "Notification" in window && Notification.permission==="granted") new Notification("Agent Idéal : validation demandée", {body:e.titre});
+}
+async function repondre(accepte){ if (!confActuelle) return; await api("/api/confirmation", {id:confActuelle, accepte}); confActuelle=null; $("voileConf").classList.remove("visible"); }
+$("confOui").onclick = () => repondre(true); $("confNon").onclick = () => repondre(false);
+
+// ---------- événements en direct
+function connecterFlux(){
+  const src = new EventSource("/api/evenements?jeton=" + encodeURIComponent(JETON));
+  src.onmessage = m => {
+    const e = JSON.parse(m.data);
+    switch (e.type){
+      case "utilisateur": ajouter("bulle user", e.texte, true); definirEnCours(true); montrerReflexion(); break;
+      case "reflexion": montrerReflexion(); break;
+      case "texte": ajouter("bulle assistant", markdown(e.texte)); if (enCours) montrerReflexion(); break;
+      case "action": ajouter("action", `<b>${echapper(e.libelle)}</b> ${e.detail ? "· "+echapper(e.detail) : ""}`); montrerReflexion(); break;
+      case "erreur_outil": ajouter("action", "⚠️ " + echapper(e.texte)); break;
+      case "confirmation": retirerReflexion(); ouvrirConfirmation(e); break;
+      case "confirmation_reponse":
+        if (confActuelle===e.id){ confActuelle=null; $("voileConf").classList.remove("visible"); }
+        ajouter("info", e.accepte ? "✅ Action validée" : "❌ Action refusée", true); break;
+      case "info": ajouter("info", e.texte, true); break;
+      case "erreur": ajouter("erreur", e.texte, true); break;
+      case "tokens": afficherTokens(e.tokens); break;
+      case "google": afficherGoogle(e.etat); break;
+      case "nouvelle": ecranVide(); break;
+      case "fin": definirEnCours(false); afficherTokens(e.tokens); break;
+      case "routine_debut": ajouter("info", "🕗 Tâche « "+e.routine+" » démarrée", true); journalTache("▶ "+e.routine+" démarrée"); break;
+      case "routine_fin":
+        ajouter("info", (e.statut==="réussie" ? "✅" : "⚠️") + " Tâche « "+e.routine+" » : "+e.statut, true);
+        journalTache("■ "+e.statut+" — "+e.resultat);
+        if ($("voileTaches").classList.contains("visible")) chargerTaches();
+        if (document.hidden && "Notification" in window && Notification.permission==="granted") new Notification("Tâche « "+e.routine+" » : "+e.statut, {body:e.resultat.slice(0,180)});
+        break;
+      case "routine_action": journalTache(e.libelle + (e.detail ? " · "+e.detail : "")); break;
+      case "routine_texte": journalTache("💬 " + e.texte.slice(0,300)); break;
+      case "routine_info": case "routine_erreur_outil": journalTache(e.texte); break;
+      case "routine_erreur": journalTache("❌ " + e.texte); ajouter("erreur", "Tâche « "+e.routine+" » : "+e.texte, true); break;
+    }
+  };
+  src.onerror = () => { $("infoPied").textContent = "⚠️ Connexion perdue avec l'agent. Relance « Agent Idéal » si cela dure."; };
+  src.onopen = () => { $("infoPied").textContent = "Arrêt d'urgence : souris dans le coin en haut à gauche de l'écran."; };
+}
+
+if ("Notification" in window && Notification.permission==="default") Notification.requestPermission();
+rafraichir(true).then(connecterFlux);
+setInterval(() => { if (!enCours) rafraichir(); }, 60000);   // vérifie le rappel Google régulièrement
+</script>
+</body>
+</html>

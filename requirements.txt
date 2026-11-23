@@ -1,0 +1,14 @@
+anthropic
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+openpyxl
+python-docx
+reportlab
+pypdf
+pillow
+pyautogui
+pyperclip
+keyring
+docx2pdf
+tzdata
