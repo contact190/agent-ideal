@@ -1,6 +1,12 @@
 @echo off
 chcp 65001 >nul
-cd /d "%~dp0"
+rem Le script se copie dans le dossier temporaire avant de mettre a jour (il ne doit pas se remplacer pendant qu'il tourne)
+if /i not "%~1"=="--copie" (
+  copy /y "%~f0" "%TEMP%\agent_ideal_maj.bat" >nul
+  "%TEMP%\agent_ideal_maj.bat" --copie "%~dp0"
+  exit /b
+)
+cd /d "%~2"
 echo Mise a jour de l'Agent Ideal depuis GitHub...
 echo (tes reglages, ta cle et tes taches ne sont pas touches)
 echo.
@@ -17,6 +23,7 @@ echo.
 echo Mise a jour des bibliotheques...
 for /f "usebackq delims=" %%P in ("requirements.txt") do ".venv\Scripts\python.exe" -m pip install "%%P" --quiet --disable-pip-version-check
 ".venv\Scripts\python.exe" verifier_installation.py
+".venv\Scripts\python.exe" creer_raccourci.py
 echo.
-echo Termine. Ferme l'agent (bouton ⏻) et relance-le pour utiliser la nouvelle version.
+echo Termine. Arrete l'agent (bouton ⏻ en haut a droite) puis relance-le avec l'icone du Bureau.
 pause

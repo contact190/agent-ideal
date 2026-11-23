@@ -58,9 +58,10 @@ def connecter() -> str:
     """Ouvre le navigateur sur la page de connexion Google et attend l'accord de l'utilisateur."""
     from google_auth_oauthlib.flow import InstalledAppFlow
     global _creds
+    import navigateur
     flow = InstalledAppFlow.from_client_config(config_application(), SCOPES)
     creds = flow.run_local_server(
-        port=0, prompt="consent", open_browser=True,
+        port=0, prompt="consent", open_browser=True, browser=navigateur.nom_webbrowser(),
         success_message="Connexion réussie ! Tu peux fermer cet onglet et revenir à l'Agent Idéal.")
     email = ""
     try:

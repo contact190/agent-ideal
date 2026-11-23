@@ -11,6 +11,7 @@ from pathlib import Path
 ici = Path(__file__).resolve().parent
 pythonw = ici / ".venv" / "Scripts" / "pythonw.exe"
 app = ici / "app.py"
+icone = ici / "icone.ico"
 
 
 def ps(texte):
@@ -24,7 +25,7 @@ def raccourci(dossier_ps, arguments):
         f"$s.TargetPath={ps(pythonw)};"
         f"$s.Arguments={ps(arguments)};"
         f"$s.WorkingDirectory={ps(ici)};"
-        "$s.IconLocation=\"$env:SystemRoot\\System32\\imageres.dll,109\";"
+        f"$s.IconLocation={ps(str(icone) + ',0')};"
         "$s.Description='Agent Idéal';$s.Save();"
     )
 

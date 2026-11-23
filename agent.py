@@ -487,6 +487,7 @@ Dossier personnel : {Path.home()}
 Dossiers où tu peux lire et écrire : {', '.join(r['dossiers_autorises']) or 'aucun'}
 Compte Google : {g.get('email') if g.get('connecte') else 'non connecté (les outils Google échoueront : propose de cliquer sur « Connecter Google »)'}
 Contrôle de l'écran : {'activé' if r.get('ecran_actif') else 'désactivé'}
+Navigateur à utiliser pour les sites et logiciels web : {__import__('navigateur').NOMS.get(r.get('navigateur', 'defaut'), 'par défaut')} (application_ouvrir l'utilise automatiquement)
 
 Logiciels métier de l'entreprise (ouvre-les avec application_ouvrir, puis pilote-les avec le contrôle de l'écran) :
 {apps or '(aucun)'}
@@ -608,14 +609,16 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
             if not cle:
                 raise RuntimeError("Clé API Claude manquante : ajoute-la dans les Réglages.")
             client = anthropic.Anthropic(api_key=cle, max_retries=4, timeout=300)
+            # figés pour toute la demande : un début de conversation stable garde les réflexions de Claude valides
+            modele = config.charger_reglages()["modele"]
+            systeme = [{"type": "text", "text": self._prompt_systeme(), "cache_control": {"type": "ephemeral"}}]
+            outils = self._outils()
             for etape in range(MAX_ETAPES):
                 if self._stop.is_set():
                     raise Arret()
                 self._pub({"type": "reflexion"})
-                r = client.messages.create(
-                    model=config.charger_reglages()["modele"], max_tokens=16000,
-                    system=[{"type": "text", "text": self._prompt_systeme(), "cache_control": {"type": "ephemeral"}}],
-                    tools=self._outils(), messages=self._messages_pour_api())
+                r = self._appeler(client, model=modele, max_tokens=16000, system=systeme, tools=outils,
+                                  messages=self._messages_pour_api())
                 u = r.usage
                 self.tokens["entree"] += u.input_tokens or 0
                 self.tokens["sortie"] += u.output_tokens or 0
@@ -676,6 +679,33 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
             self.en_cours = False
             self._sauver()
             self._pub({"type": "fin", "tokens": self.tokens})
+
+    _reflexion_ok = True     # passe à False si le modèle choisi ne gère pas la réflexion « adaptive »
+
+    def _appeler(self, client, **kw):
+        """Appel à Claude avec réflexion adaptative. Les blocs de réflexion devenus invalides (début de
+        conversation modifié : anciennes captures retirées, nouvelle heure…) sont simplement ignorés
+        au lieu de provoquer une erreur 400."""
+        import anthropic
+        if Agent._reflexion_ok:
+            try:
+                return client.beta.messages.create(
+                    betas=["thinking-binding-controls-2026-08-01"],
+                    thinking={"type": "adaptive", "block_binding": {"prefix_mismatch_behavior": "drop_block"}}, **kw)
+            except anthropic.BadRequestError as e:
+                texte = str(e).lower()
+                if not any(m in texte for m in ("thinking", "block_binding", "adaptive", "beta")):
+                    raise
+                config.journal(f"Réflexion adaptative indisponible, repli sans réflexion : {e}")
+                Agent._reflexion_ok = False
+        propres = []
+        for m in kw["messages"]:
+            if isinstance(m["content"], list):
+                contenu = [b for b in m["content"] if b.get("type") not in ("thinking", "redacted_thinking")]
+                m = dict(m, content=contenu or [{"type": "text", "text": "…"}])
+            propres.append(m)
+        kw["messages"] = propres
+        return client.messages.create(**kw)
 
     def _reparer_fin(self):
         """Après une interruption, l'historique doit rester valide pour l'API."""

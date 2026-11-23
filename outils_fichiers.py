@@ -437,8 +437,11 @@ def ouvrir_application(nom_ou_adresse: str) -> str:
         if app["nom"].lower() == nom_ou_adresse.lower():
             nom_ou_adresse = app["adresse"]
             break
-    if re.match(r"^https?://", nom_ou_adresse):
-        webbrowser.open(nom_ou_adresse)
+    if re.match(r"^https?://", nom_ou_adresse) or re.match(r"^[\w-]+(\.[\w-]+)+(/|$)", nom_ou_adresse):
+        if not nom_ou_adresse.startswith("http"):
+            nom_ou_adresse = "https://" + nom_ou_adresse
+        import navigateur
+        navigateur.ouvrir(nom_ou_adresse)
         return f"Ouvert dans le navigateur : {nom_ou_adresse}"
     if sys.platform == "win32":
         try:

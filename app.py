@@ -27,6 +27,7 @@ if sys.stdout is None or sys.stderr is None:          # lancé sans console (pyt
     sys.stderr = sys.stderr or _sortie
 import outils_google as G
 import agent as module_agent
+import navigateur
 import routines
 from agent import Agent, Bus
 
@@ -51,6 +52,7 @@ def etat_complet():
         "tokens": agent.tokens,
         "fil": agent.fil_pour_affichage(),
         "planificateur": planificateur.etat() if planificateur else {},
+        "navigateurs": navigateur.disponibles(),
     }
 
 
@@ -74,6 +76,26 @@ def tester_cle(cle: str) -> str:
         return "Impossible de joindre Anthropic : vérifie la connexion Internet."
     except Exception as e:
         return f"{type(e).__name__} : {e}"
+
+
+def choisir_dossier() -> str:
+    """Ouvre la fenêtre Windows « Choisir un dossier » sur l'ordinateur et renvoie le chemin choisi ('' si annulé)."""
+    import subprocess
+    import tempfile
+    sortie = Path(tempfile.gettempdir()) / f"agent_ideal_dossier_{secrets.token_hex(4)}.txt"
+    code = ("import sys, tkinter as tk, tkinter.filedialog as fd\n"
+            "r = tk.Tk(); r.withdraw(); r.attributes('-topmost', True); r.update()\n"
+            "c = fd.askdirectory(parent=r, title=\"Agent Idéal : choisis un dossier que l'agent pourra utiliser\", mustexist=True)\n"
+            "open(sys.argv[1], 'w', encoding='utf-8').write(c or '')\n")
+    try:
+        subprocess.run([sys.executable, "-c", code, str(sortie)], timeout=600)
+        chemin = sortie.read_text(encoding="utf-8").strip() if sortie.exists() else ""
+    finally:
+        try:
+            sortie.unlink()
+        except Exception:
+            pass
+    return str(Path(chemin)) if chemin else ""
 
 
 def connecter_google():
@@ -129,10 +151,15 @@ class Gestionnaire(BaseHTTPRequestHandler):
             return
         if chemin == "/ping":
             return self._json({"app": "agent-ideal"})
-        if chemin == "/favicon.ico":
-            self.send_response(204)
-            self.send_header("Content-Length", "0")
+        if chemin in ("/favicon.ico", "/icone.png"):
+            fichier = Path(__file__).parent / ("icone.ico" if chemin == "/favicon.ico" else "interface/icone.png")
+            corps = fichier.read_bytes() if fichier.exists() else b""
+            self.send_response(200 if corps else 204)
+            self.send_header("Content-Type", "image/x-icon" if chemin == "/favicon.ico" else "image/png")
+            self.send_header("Content-Length", str(len(corps)))
+            self.send_header("Cache-Control", "max-age=86400")
             self.end_headers()
+            self.wfile.write(corps)
             return
         if not self._autorise():
             return self._json({"erreur": "non autorisé"}, 403)
@@ -213,6 +240,8 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if "dossiers_autorises" in d:
                 d["dossiers_autorises"] = [x.strip() for x in d["dossiers_autorises"] if x.strip() and Path(x.strip()).expanduser().is_dir()]
             return self._json({"ok": True, "reglages": config.enregistrer_reglages(d)})
+        if chemin == "/api/choisir_dossier":
+            return self._json({"chemin": choisir_dossier()})
         if chemin == "/api/routines/enregistrer":
             try:
                 return self._json({"ok": True, "routine": routines.enregistrer(d)})
@@ -262,7 +291,7 @@ def main():
     global serveur
     deja = _deja_lance()
     if deja:
-        webbrowser.open(deja)
+        navigateur.ouvrir(deja)
         return
     global planificateur
     planificateur = routines.Planificateur(bus)
@@ -274,7 +303,7 @@ def main():
     print(f"Agent Idéal démarré : {adresse}  (ferme cette fenêtre pour l'arrêter)")
     config.journal(f"Démarrage sur {adresse}")
     if "--sans-navigateur" not in sys.argv:
-        threading.Timer(0.8, lambda: webbrowser.open(adresse)).start()
+        threading.Timer(0.8, lambda: navigateur.ouvrir(adresse)).start()
     try:
         serveur.serve_forever()
     except KeyboardInterrupt:

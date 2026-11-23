@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Idéal</title>
+<link rel="icon" href="/favicon.ico">
 <style>
   :root{
     --fond:#f4f6f9; --carte:#ffffff; --texte:#1b2430; --doux:#66707d; --bord:#e2e6ec;
@@ -64,6 +65,9 @@
   .pastille.ok{background:#e3f3ea;color:var(--vert)}
   .pastille.ko{background:var(--ambre-fond);color:var(--ambre)}
   .ligne{display:flex;gap:8px;margin-top:8px}
+  .liste-dossiers{display:flex;flex-direction:column;gap:6px}
+  .dossier{display:flex;align-items:center;gap:8px;border:1px solid var(--bord);border-radius:8px;padding:7px 10px;font-size:13.5px;background:#fafbfc}
+  .dossier span{flex:1;word-break:break-all}.dossier button{padding:2px 9px;font-size:13px}
   .message-form{font-size:13px;margin-top:6px}
   .message-form.ko{color:var(--rouge)}.message-form.ok{color:var(--vert)}
   .interrupteur{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px}
@@ -84,6 +88,7 @@
 <body>
 <div class="app">
   <header>
+    <img src="/icone.png" alt="" style="width:30px;height:30px;border-radius:7px">
     <h1>Agent Idéal</h1><span class="etat" id="etatHaut"></span>
     <div class="espace"></div>
     <button id="btnNouvelle" title="Nouvelle conversation">＋ Nouvelle</button>
@@ -167,16 +172,19 @@
       <option value="claude-opus-5-5">Claude Opus 5.5 — le plus capable, plus cher</option>
       <option value="claude-haiku-5-5">Claude Haiku 5.5 — le plus économique</option>
     </select>
-    <label>Dossiers autorisés (un par ligne)</label>
-    <textarea id="dossiers" rows="4"></textarea>
-    <div class="aide">L'agent ne peut lire et écrire que dans ces dossiers.</div>
+    <label>Navigateur utilisé par l'agent</label>
+    <select id="navigateur"></select>
+    <label>Dossiers autorisés</label>
+    <div id="listeDossiers" class="liste-dossiers"></div>
+    <button id="btnAjouterDossier" style="margin-top:8px">📁 Ajouter un dossier…</button>
+    <div class="aide">L'agent ne peut lire et écrire que dans ces dossiers. Une fenêtre Windows s'ouvre pour choisir.</div>
     <div class="interrupteur"><input type="checkbox" id="ecran"><span>Contrôle de l'écran (souris et clavier) pour piloter les logiciels</span></div>
     <div class="interrupteur"><input type="checkbox" id="commandes"><span>Commandes Windows (chaque commande est validée par toi)</span></div>
     <div class="interrupteur"><input type="checkbox" id="modeTest"><span>Application Google en mode test (rappel de reconnexion tous les 7 jours)</span></div>
     <label>Logiciels métier (un par ligne : Nom | adresse | description)</label>
     <textarea id="applications" rows="3"></textarea>
     <label>Consignes permanentes pour l'agent</label>
-    <textarea id="consignes" rows="3" placeholder="ex. Toujours ranger les devis dans Documents\\Clients. TVA 19 %."></textarea>
+    <textarea id="consignes" rows="3" placeholder="ex. Toujours ranger les devis dans Documents\Clients. TVA 19 %."></textarea>
     <div class="message-form" id="msgReglages"></div>
   </div>
 
@@ -280,7 +288,9 @@ function afficherGoogle(g, connexion){
 }
 function remplirReglages(r){
   $("nom").value = r.nom_utilisateur||""; $("entreprise").value = r.entreprise||"";
-  $("modele").value = r.modele; $("dossiers").value = (r.dossiers_autorises||[]).join("\n");
+  $("modele").value = r.modele; dossiers = [...(r.dossiers_autorises||[])]; afficherDossiers();
+  $("navigateur").innerHTML = (etat.navigateurs||[{id:"defaut",nom:"Navigateur par défaut"}]).map(n => `<option value="${n.id}">${echapper(n.nom)}</option>`).join("");
+  $("navigateur").value = r.navigateur || "defaut";
   $("ecran").checked = !!r.ecran_actif; $("commandes").checked = !!r.commandes_actives; $("modeTest").checked = !!r.google_mode_test;
   $("applications").value = (r.applications||[]).map(a => [a.nom, a.adresse, a.description||""].join(" | ")).join("\n");
   $("consignes").value = r.consignes||"";
@@ -299,6 +309,24 @@ async function rafraichir(premiere){
 }
 
 // ---------- réglages
+let dossiers = [];
+function afficherDossiers(){
+  const l = $("listeDossiers"); l.innerHTML = dossiers.length ? "" : '<div class="aide">Aucun dossier : l\'agent ne pourra pas toucher aux fichiers.</div>';
+  dossiers.forEach((d, i) => {
+    const el = document.createElement("div"); el.className = "dossier";
+    el.innerHTML = `<span>📁 ${echapper(d)}</span><button title="Retirer">✕</button>`;
+    el.querySelector("button").onclick = () => { dossiers.splice(i, 1); afficherDossiers(); };
+    l.appendChild(el);
+  });
+}
+$("btnAjouterDossier").onclick = async () => {
+  const b = $("btnAjouterDossier"); b.disabled = true; b.textContent = "Choisis le dossier dans la fenêtre Windows…";
+  try {
+    const r = await api("/api/choisir_dossier", {});
+    if (r.chemin && !dossiers.includes(r.chemin)) { dossiers.push(r.chemin); afficherDossiers();
+      $("msgReglages").className="message-form"; $("msgReglages").textContent="Dossier ajouté : clique sur « Enregistrer les préférences » pour valider."; }
+  } finally { b.disabled = false; b.textContent = "📁 Ajouter un dossier…"; }
+};
 function ouvrirReglages(accueil){
   $("titreReglages").textContent = accueil ? "Bienvenue ! Configurons l'agent" : "Réglages";
   $("introReglages").textContent = accueil ? "Deux étapes rapides, à faire une seule fois." : "";
@@ -323,7 +351,7 @@ $("btnSauverReglages").onclick = async () => {
     .map(p => ({nom:p[0], adresse:p[1], description:p[2]||""}));
   const r = await api("/api/reglages", {
     nom_utilisateur:$("nom").value.trim(), entreprise:$("entreprise").value.trim(), modele:$("modele").value,
-    dossiers_autorises:$("dossiers").value.split("\n"), ecran_actif:$("ecran").checked, commandes_actives:$("commandes").checked,
+    dossiers_autorises:dossiers, navigateur:$("navigateur").value, ecran_actif:$("ecran").checked, commandes_actives:$("commandes").checked,
     google_mode_test:$("modeTest").checked, applications, consignes:$("consignes").value.trim()});
   const m = $("msgReglages"); m.className="message-form ok"; m.textContent="✅ Préférences enregistrées.";
   etat.reglages = r.reglages; remplirReglages(r.reglages); rafraichir();
