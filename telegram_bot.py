@@ -181,6 +181,7 @@ class BotTelegram:
         self._derniere_maj = 0
         self._confs = {}                # id confirmation -> (message_id, texte)
         self._offset = None
+        self._dernier_message = None
         self._arret = threading.Event()
         self._fils = []
 
@@ -461,6 +462,7 @@ class BotTelegram:
         if not m:
             return
         chat = m["chat"]["id"]
+        self._dernier_message = m.get("message_id")
         texte = (m.get("text") or m.get("caption") or "").strip()
 
         # appairage
@@ -509,7 +511,7 @@ class BotTelegram:
         if texte.lower().strip(" .!") in ("mise à jour", "mise a jour", "mets-toi à jour", "mets toi à jour", "update"):
             texte = "/majour"
         if texte.startswith("/"):
-            self._commande(texte.split()[0].split("@")[0].lower())
+            self._commande(texte.split()[0].split("@")[0].lower(), texte)
             return
         if not texte:
             return
@@ -533,7 +535,13 @@ class BotTelegram:
             octets = telecharger(self.jeton, file_id)
             texte = transcription.transcrire(octets, nom, prevenir=lambda t: self.envoyer(html.escape(t)))
         except transcription.ErreurTranscription as e:
-            self.envoyer("🎙️ " + html.escape(str(e)))
+            texte_err = str(e)
+            if "Aucun moyen" in texte_err or "Pas de clé" in texte_err:
+                texte_err = ("Pour comprendre les vocaux, il me faut une clé Groq gratuite :\n"
+                             "1. Ouvre console.groq.com/keys sur ton téléphone (connexion avec Google possible)\n"
+                             "2. Create API Key → copie la clé (gsk_…)\n"
+                             "3. Envoie-moi : /groq ta_clé")
+            self.envoyer("🎙️ " + html.escape(texte_err))
             return
         except Exception as e:
             self.envoyer(f"🎙️ Je n'ai pas pu lire ce vocal ({html.escape(type(e).__name__)} : {html.escape(str(e)[:200])}).")
@@ -576,7 +584,7 @@ class BotTelegram:
             return None
         return str(chemin)
 
-    def _commande(self, cmd):
+    def _commande(self, cmd, texte=""):
         import routines
         if cmd in ("/aide", "/help", "/start"):
             self.envoyer(AIDE, clavier=True)
@@ -606,6 +614,21 @@ class BotTelegram:
             except Exception:
                 pass
             self.envoyer("\n".join(html.escape(x) for x in lignes))
+        elif cmd == "/groq":
+            import transcription
+            morceaux = texte.split(maxsplit=1)
+            # on efface le message qui contient la clé, pour qu'elle ne reste pas dans la conversation
+            try:
+                appel(self.jeton, "deleteMessage", {"chat_id": self.chat_id, "message_id": self._dernier_message})
+            except Exception:
+                pass
+            if len(morceaux) < 2 or not morceaux[1].strip().startswith("gsk_"):
+                self.envoyer("Envoie : <code>/groq ta_clé</code> (elle commence par gsk_). "
+                             "Crée-la gratuitement sur console.groq.com/keys → Create API Key.")
+                return
+            transcription.enregistrer_cle("groq", morceaux[1].strip())
+            self.envoyer("✅ Clé Groq enregistrée sur le PC (message effacé de la conversation). "
+                         "Envoie-moi un vocal pour essayer !")
         elif cmd == "/majour":
             import mise_a_jour
             try:

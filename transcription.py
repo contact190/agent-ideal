@@ -47,23 +47,24 @@ def lire_cle(fournisseur: str) -> str:
 
 def enregistrer_cle(fournisseur: str, cle: str):
     cle = cle.strip()
+    fichier = config.DOSSIER_DONNEES / f".stt_{fournisseur}"
     try:
         import keyring
         if cle:
             keyring.set_password(config.NOM_APP, f"stt_{fournisseur}", cle)
-        else:
-            try:
-                keyring.delete_password(config.NOM_APP, f"stt_{fournisseur}")
-            except Exception:
-                pass
-        return
+            if fichier.exists():
+                fichier.unlink()
+            return
+        try:
+            keyring.delete_password(config.NOM_APP, f"stt_{fournisseur}")
+        except Exception:
+            pass
     except Exception:
-        pass
-    f = config.DOSSIER_DONNEES / f".stt_{fournisseur}"
-    if cle:
-        f.write_text(cle, encoding="utf-8")
-    elif f.exists():
-        f.unlink()
+        if cle:
+            fichier.write_text(cle, encoding="utf-8")
+            return
+    if not cle and fichier.exists():
+        fichier.unlink()
 
 
 def local_disponible() -> bool:
