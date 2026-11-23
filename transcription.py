@@ -107,13 +107,20 @@ def _en_ligne(fournisseur, octets, nom):
         corps += f"--{limite}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode("utf-8")
     corps += (f"--{limite}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{nom}\"\r\n"
               f"Content-Type: audio/ogg\r\n\r\n").encode("utf-8") + octets + f"\r\n--{limite}--\r\n".encode()
-    req = urllib.request.Request(url, data=corps, headers={"Authorization": f"Bearer {cle}",
-                                                           "Content-Type": f"multipart/form-data; boundary={limite}"})
+    req = urllib.request.Request(url, data=corps, headers={
+        "Authorization": f"Bearer {cle}",
+        "Content-Type": f"multipart/form-data; boundary={limite}",
+        # sans identité de navigateur, Cloudflare (qui protège Groq) refuse avec « error code: 1010 »
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AgentIdeal/1.0",
+        "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             return json.loads(r.read()).get("text", "").strip()
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "ignore")[:300]
+        if e.code == 403 and "1010" in detail:
+            raise ErreurTranscription("Le service de transcription a bloqué la demande (protection anti-robots). "
+                                      "Fais /majour pour avoir le correctif, puis réessaie.")
         if e.code == 401:
             raise ErreurTranscription(f"Clé {fournisseur.capitalize()} refusée : vérifie-la dans les Réglages.")
         if e.code == 429:

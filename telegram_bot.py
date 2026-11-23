@@ -90,10 +90,11 @@ def appel(jeton, methode, donnees=None, fichier=None, delai=40):
         champ, nom, octets, mime = fichier
         corps += (f"--{limite}\r\nContent-Disposition: form-data; name=\"{champ}\"; filename=\"{nom}\"\r\n"
                   f"Content-Type: {mime}\r\n\r\n").encode("utf-8") + octets + f"\r\n--{limite}--\r\n".encode()
-        req = urllib.request.Request(url, data=corps, headers={"Content-Type": f"multipart/form-data; boundary={limite}"})
+        req = urllib.request.Request(url, data=corps, headers={"Content-Type": f"multipart/form-data; boundary={limite}",
+                                                               "User-Agent": "AgentIdeal/1.0"})
     else:
         req = urllib.request.Request(url, data=json.dumps(donnees or {}).encode("utf-8"),
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json", "User-Agent": "AgentIdeal/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=delai) as r:
             rep = json.loads(r.read())
