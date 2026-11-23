@@ -340,6 +340,28 @@ def _resume(nom, a):
     return ""
 
 
+def _resultat(appel, contenu, erreur=False):
+    """Réponse à un appel d'outil. Pour les actions d'écran (toolset « computer »), l'API exige
+    que la réponse porte le même toolset_name que l'appel."""
+    r = {"type": "tool_result", "tool_use_id": appel["id"], "content": contenu, "is_error": bool(erreur)}
+    if appel.get("toolset_name"):
+        r["toolset_name"] = appel["toolset_name"]
+    return r
+
+
+def _reparer_historique(messages):
+    """Ajoute le toolset_name manquant aux réponses déjà enregistrées (conversations créées avant le correctif)."""
+    appels = {}
+    for m in messages:
+        if isinstance(m.get("content"), list):
+            for b in m["content"]:
+                if b.get("type") == "tool_use" and b.get("toolset_name"):
+                    appels[b["id"]] = b["toolset_name"]
+                elif b.get("type") == "tool_result" and b.get("tool_use_id") in appels and not b.get("toolset_name"):
+                    b["toolset_name"] = appels[b["tool_use_id"]]
+    return messages
+
+
 # ================================================================ l'agent
 
 class Arret(Exception):
@@ -532,7 +554,7 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
 
     def _messages_pour_api(self):
         """Copie des messages : anciennes captures retirées, point de cache sur le dernier bloc."""
-        msgs = json.loads(json.dumps(self.messages, default=str))
+        msgs = _reparer_historique(json.loads(json.dumps(self.messages, default=str)))
         vues = 0
         for m in reversed(msgs):
             if isinstance(m.get("content"), list):
@@ -645,7 +667,7 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
                 resultats = []
                 for b in appels:
                     if self._stop.is_set():
-                        resultats.append({"type": "tool_result", "tool_use_id": b["id"], "content": "Arrêté par l'utilisateur.", "is_error": True})
+                        resultats.append(_resultat(b, "Arrêté par l'utilisateur.", True))
                         continue
                     try:
                         sortie, erreur = self._executer_outil(b)
@@ -662,7 +684,7 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
                             sortie, erreur = f"Erreur : {type(e).__name__} : {e}", True
                     if erreur:
                         self._pub({"type": "erreur_outil", "texte": str(sortie)[:300]})
-                    resultats.append({"type": "tool_result", "tool_use_id": b["id"], "content": sortie, "is_error": erreur})
+                    resultats.append(_resultat(b, sortie, erreur))
                 self.messages.append({"role": "user", "content": resultats})
                 self._sauver()
             else:
@@ -713,7 +735,7 @@ Commence par relire le carnet (carnet_lire) et termine en y notant ce qui sera u
             appels = [b for b in self.messages[-1]["content"] if isinstance(b, dict) and b.get("type") == "tool_use"]
             if appels:
                 self.messages.append({"role": "user", "content": [
-                    {"type": "tool_result", "tool_use_id": b["id"], "content": "Interrompu.", "is_error": True} for b in appels]})
+                    _resultat(b, "Interrompu.", True) for b in appels]})
         if self.messages and self.messages[-1]["role"] == "user":
             self.messages.append({"role": "assistant", "content": [{"type": "text", "text": "(travail interrompu)"}]})
 
