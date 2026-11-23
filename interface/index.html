@@ -179,7 +179,10 @@
       <div class="aide">Ou ouvre <a id="telLien" target="_blank" rel="noopener"></a> — ou envoie au bot : <b id="telCode"></b> (valable 15 min)</div>
     </div>
     <div id="telActions" class="ligne" style="flex-wrap:wrap"></div>
-    <div class="interrupteur" id="telNotif" style="display:none"><input type="checkbox" id="telNotifTaches"><span>Me prévenir à la fin de chaque tâche automatique</span></div>
+    <div id="telNotif" style="display:none">
+      <div class="interrupteur"><input type="checkbox" id="telToutSuivre"><span>M'envoyer aussi les réponses et questions des demandes faites depuis le PC</span></div>
+      <div class="interrupteur"><input type="checkbox" id="telNotifTaches"><span>Me prévenir à la fin de chaque tâche automatique</span></div>
+    </div>
     <div class="message-form" id="msgTel"></div>
   </div>
 
@@ -316,6 +319,7 @@ function remplirReglages(r){
   $("applications").value = (r.applications||[]).map(a => [a.nom, a.adresse, a.description||""].join(" | ")).join("\n");
   $("consignes").value = r.consignes||"";
   $("telNotifTaches").checked = r.telegram_notifier_taches !== false;
+  $("telToutSuivre").checked = r.telegram_tout_suivre !== false;
   afficherTelegram(etat.telegram);
 }
 async function rafraichir(premiere){
@@ -368,6 +372,7 @@ $("btnTelJeton").onclick = async () => {
   $("telJeton").value=""; afficherTelegram(r.telegram); afficherAppairage(r.appairage);
 };
 $("telNotifTaches").onchange = () => api("/api/reglages", {telegram_notifier_taches: $("telNotifTaches").checked});
+$("telToutSuivre").onchange = () => api("/api/reglages", {telegram_tout_suivre: $("telToutSuivre").checked});
 
 // ---------- réglages
 let dossiers = [];

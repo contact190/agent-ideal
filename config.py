@@ -42,6 +42,7 @@ REGLAGES_PAR_DEFAUT = {
     "telegram_chat_id": None,        # compte Telegram appairé (téléphone)
     "telegram_nom": "",
     "telegram_notifier_taches": True,
+    "telegram_tout_suivre": True,    # relayer aussi les réponses et questions des demandes faites depuis le PC
     "telegram_notifier_debut": False,          # defaut, chrome, edge, firefox, brave, opera
     "commandes_actives": True,
     "google_mode_test": False,      # True quand l'application Google est « Externe » en mode test (reconnexion tous les 7 jours)

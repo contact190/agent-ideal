@@ -299,8 +299,12 @@ class BotTelegram:
         finally:
             self.bus.desabonner(q)
 
+    def _suivre(self):
+        """Relayer cette conversation ? Oui si la demande vient du téléphone, ou si l'option « tout suivre » est active."""
+        return self._suivi or config.charger_reglages().get("telegram_tout_suivre", True)
+
     def _progression(self, texte):
-        if not self._suivi:
+        if not self._suivre():
             return
         maintenant = time.time()
         if self._msg_progression is None:
@@ -322,18 +326,24 @@ class BotTelegram:
     def _traiter_evenement(self, e):
         t = e.get("type")
         r = config.charger_reglages()
-        if t == "action":
+        suivre = self._suivre()
+        if t == "utilisateur" and suivre and not self._suivi:
+            # demande tapée sur le PC : on la montre pour que la suite ait du sens sur le téléphone
+            self.envoyer(f"💻 <i>Demande depuis le PC :</i>\n{html.escape(e['texte'][:1500])}")
+        elif t == "action":
             self._progression(f"{e.get('libelle', '')} {('· ' + e['detail']) if e.get('detail') else ''}")
-        elif t == "texte" and self._suivi:
+        elif t == "texte" and suivre:
             self._fin_progression()
             self.envoyer(en_html(e["texte"]))
-        elif t == "erreur" and self._suivi:
+        elif t == "erreur" and suivre:
             self._fin_progression()
             self.envoyer("❌ " + html.escape(e["texte"]))
-        elif t == "info" and self._suivi:
+        elif t == "info" and suivre:
             self.envoyer("ℹ️ " + html.escape(e["texte"]))
-        elif t == "fin" and self._suivi:
+        elif t == "fin" and suivre:
             self._fin_progression()
+            if self.agent.messages and self._attend_reponse():
+                self.envoyer("💬 <i>L'agent attend ta réponse : réponds simplement ici (ou sur le PC).</i>")
             self._suivi = False
         elif t == "confirmation":
             texte = (f"🔔 <b>{html.escape(e['titre'])}</b>\n\n{html.escape(e['details'][:3000])}\n\n"
@@ -467,6 +477,14 @@ class BotTelegram:
         self._suivi = True
         self._msg_progression = None
         self.agent.envoyer(texte)
+
+    def _attend_reponse(self):
+        """La dernière réponse de l'agent se termine-t-elle par une question ?"""
+        dernier = self.agent.messages[-1]
+        if dernier.get("role") != "assistant" or not isinstance(dernier.get("content"), list):
+            return False
+        textes = [b.get("text", "") for b in dernier["content"] if b.get("type") == "text"]
+        return bool(textes) and textes[-1].rstrip().endswith("?")
 
     def _enregistrer_piece(self, file_id, nom):
         dossiers = config.charger_reglages().get("dossiers_autorises") or []
