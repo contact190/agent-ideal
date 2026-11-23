@@ -7,7 +7,7 @@ echo.
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop';" ^
   "$z=Join-Path $env:TEMP 'agent-ideal-maj.zip'; $d=Join-Path $env:TEMP 'agent-ideal-maj';" ^
-  "Invoke-WebRequest 'https://github.com/contact190/agent-ideal/releases/latest/download/agent-ideal.zip' -OutFile $z;" ^
+  "Invoke-WebRequest 'https://github.com/contact190/agent-ideal/archive/refs/heads/main.zip' -OutFile $z;" ^
   "if (Test-Path $d) { Remove-Item $d -Recurse -Force }; Expand-Archive $z $d;" ^
   "$src=Get-ChildItem $d -Directory | Select-Object -First 1;" ^
   "Copy-Item (Join-Path $src.FullName '*') -Destination '.' -Recurse -Force;" ^

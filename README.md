@@ -10,17 +10,17 @@ Tu lui écris ce que tu veux en français, en arabe ou en darija. Il le fait : f
 
 ### 1. Télécharger
 
-👉 **[Télécharger l'Agent Idéal](https://github.com/contact190/agent-ideal/releases/latest/download/agent-ideal.zip)**
+👉 **[Télécharger l'Agent Idéal](https://github.com/contact190/agent-ideal/archive/refs/heads/main.zip)**
 
 ### 2. Extraire
 
-Ouvre ton dossier **Téléchargements** et fais un **clic droit** sur `agent-ideal.zip`. Choisis **Extraire tout…**, puis choisis le dossier **Documents** et clique sur **Extraire**.
+Ouvre ton dossier **Téléchargements** et fais un **clic droit** sur `agent-ideal-main.zip`. Choisis **Extraire tout…**, puis choisis le dossier **Documents** et clique sur **Extraire**.
 
 > ⚠️ Ne lance rien depuis l'intérieur du zip, sinon l'installation échoue.
 
 ### 3. Installer
 
-Dans le dossier extrait `agent-ideal`, double-clique sur **`1_INSTALLER.bat`**.
+Dans le dossier extrait `agent-ideal-main`, double-clique sur **`1_INSTALLER.bat`**.
 
 - Si Windows affiche « Windows a protégé votre ordinateur », clique sur **Informations complémentaires**, puis **Exécuter quand même**.
 - Si Python n'est pas installé, il est installé automatiquement.
