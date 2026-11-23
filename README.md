@@ -62,6 +62,24 @@ L'agent te montre la tâche et te demande de la valider. Tu choisis alors à qui
 
 > Les tâches s'exécutent quand l'ordinateur est **allumé**. S'il était éteint à l'heure prévue, la tâche est rattrapée dans les 12 heures qui suivent.
 
+## 📱 Sur ton téléphone (Telegram)
+
+Tu peux suivre l'agent, valider ses actions et lui donner des ordres depuis ton téléphone, même loin du bureau.
+
+1. Sur le téléphone, ouvre **Telegram** et cherche **@BotFather**.
+2. Envoie **/newbot**, puis donne un nom (par exemple *Agent Idéal*) et un identifiant qui finit par *bot*.
+3. BotFather te donne un **jeton**. Colle-le dans l'agent, dans **⚙ Réglages → Téléphone**.
+4. **Scanne le QR code** affiché avec le téléphone, puis appuie sur **Démarrer**. C'est relié.
+
+Ensuite, sur Telegram :
+- **Écris ta demande**, et l'agent la fait sur le PC puis te répond.
+- Quand l'agent veut envoyer un mail ou supprimer quelque chose, tu reçois les boutons **✅ Valider / ❌ Refuser**.
+- À la fin de chaque tâche automatique, tu reçois son compte-rendu.
+- Envoie une **photo ou un fichier** : il est rangé sur le PC, dans *Reçus Telegram*, et l'agent s'en sert.
+- Commandes : **/ecran** (capture du PC), **/taches**, **/etat**, **/stop**, **/nouvelle**.
+
+> Le bot ne répond qu'au téléphone que tu as relié. Le PC doit être allumé.
+
 ## 🔒 Sécurité
 
 - **Envoyer un e-mail, partager, supprimer, remplacer un fichier, exécuter une commande** : une fenêtre te demande de valider.

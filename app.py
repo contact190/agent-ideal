@@ -6,6 +6,7 @@ distant sécurisé sur ces mêmes routes /api/…
 """
 
 import json
+import re
 import secrets
 import socket
 import sys
@@ -29,6 +30,7 @@ import outils_google as G
 import agent as module_agent
 import navigateur
 import routines
+import telegram_bot
 from agent import Agent, Bus
 
 PORT_PREFERE = 8765
@@ -38,6 +40,15 @@ DOSSIER_INTERFACE = Path(__file__).parent / "interface"
 bus = Bus()
 agent = Agent(bus)
 planificateur = None          # démarré dans main()
+bot = None                    # bot Telegram, démarré dans main()
+
+
+def repondre_confirmation(id_conf, accepte) -> bool:
+    """Une validation peut venir de la conversation ou d'une tâche automatique en cours."""
+    if agent.repondre_confirmation(id_conf, accepte):
+        return True
+    en_cours = planificateur._agent_en_cours if planificateur else None
+    return bool(en_cours and en_cours.repondre_confirmation(id_conf, accepte))
 _google_connexion = {"en_cours": False, "erreur": ""}
 
 
@@ -53,6 +64,7 @@ def etat_complet():
         "fil": agent.fil_pour_affichage(),
         "planificateur": planificateur.etat() if planificateur else {},
         "navigateurs": navigateur.disponibles(),
+        "telegram": bot.etat() if bot else {},
     }
 
 
@@ -214,7 +226,7 @@ class Gestionnaire(BaseHTTPRequestHandler):
             agent.arreter()
             return self._json({"ok": True})
         if chemin == "/api/confirmation":
-            return self._json({"ok": agent.repondre_confirmation(d.get("id", ""), d.get("accepte", False))})
+            return self._json({"ok": repondre_confirmation(d.get("id", ""), d.get("accepte", False))})
         if chemin == "/api/nouvelle":
             return self._json({"ok": agent.nouvelle_conversation()})
         if chemin == "/api/cle":
@@ -240,6 +252,35 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if "dossiers_autorises" in d:
                 d["dossiers_autorises"] = [x.strip() for x in d["dossiers_autorises"] if x.strip() and Path(x.strip()).expanduser().is_dir()]
             return self._json({"ok": True, "reglages": config.enregistrer_reglages(d)})
+        if chemin == "/api/telegram/jeton":
+            jeton = (d.get("jeton") or "").strip()
+            if not re.match(r"^\d+:[\w-]{30,}$", jeton):
+                return self._json({"ok": False, "erreur": "Ce n'est pas un jeton de bot (format 123456789:ABC…). Copie-le depuis @BotFather."})
+            try:
+                telegram_bot.verifier_jeton(jeton)
+            except Exception as e:
+                return self._json({"ok": False, "erreur": f"Jeton refusé par Telegram : {e}"})
+            telegram_bot.enregistrer_jeton(jeton)
+            bot.dissocier()
+            bot.demarrer()
+            return self._json({"ok": True, "telegram": bot.etat(), "appairage": bot.nouveau_code()})
+        if chemin == "/api/telegram/code":
+            if not bot.jeton:
+                return self._json({"ok": False, "erreur": "Enregistre d'abord le jeton du bot."})
+            return self._json({"ok": True, "appairage": bot.nouveau_code()})
+        if chemin == "/api/telegram/dissocier":
+            bot.dissocier()
+            return self._json({"ok": True, "telegram": bot.etat()})
+        if chemin == "/api/telegram/supprimer":
+            bot.arreter()
+            bot.dissocier()
+            telegram_bot.effacer_jeton()
+            bot.jeton = ""
+            bot.info_bot = {}
+            return self._json({"ok": True, "telegram": bot.etat()})
+        if chemin == "/api/telegram/test":
+            m = bot.envoyer("👋 Test depuis ton PC : le téléphone est bien relié à l'Agent Idéal.")
+            return self._json({"ok": bool(m), "erreur": "" if m else (bot.erreur or "Envoi impossible.")})
         if chemin == "/api/choisir_dossier":
             return self._json({"chemin": choisir_dossier()})
         if chemin == "/api/routines/enregistrer":
@@ -296,6 +337,9 @@ def main():
     global planificateur
     planificateur = routines.Planificateur(bus)
     module_agent.PLANIFICATEUR = planificateur
+    global bot
+    bot = telegram_bot.BotTelegram(bus, agent, planificateur, repondre_confirmation)
+    bot.demarrer()
     port = _port_libre()
     serveur = ThreadingHTTPServer(("127.0.0.1", port), Gestionnaire)
     serveur.daemon_threads = True

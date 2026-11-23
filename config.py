@@ -38,7 +38,11 @@ REGLAGES_PAR_DEFAUT = {
     "modele": "claude-sonnet-5-5",
     "dossiers_autorises": _dossiers_par_defaut(),
     "ecran_actif": True,
-    "navigateur": "defaut",          # defaut, chrome, edge, firefox, brave, opera
+    "navigateur": "defaut",
+    "telegram_chat_id": None,        # compte Telegram appairé (téléphone)
+    "telegram_nom": "",
+    "telegram_notifier_taches": True,
+    "telegram_notifier_debut": False,          # defaut, chrome, edge, firefox, brave, opera
     "commandes_actives": True,
     "google_mode_test": False,      # True quand l'application Google est « Externe » en mode test (reconnexion tous les 7 jours)
     "rappel_google_jours": 6,

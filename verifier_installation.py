@@ -4,7 +4,7 @@ import sys
 
 modules = {"anthropic": "anthropic", "googleapiclient": "google-api-python-client", "google_auth_oauthlib": "google-auth-oauthlib",
            "google_auth_httplib2": "google-auth-httplib2", "openpyxl": "openpyxl", "docx": "python-docx", "reportlab": "reportlab",
-           "pypdf": "pypdf", "PIL": "pillow", "pyautogui": "pyautogui", "pyperclip": "pyperclip", "keyring": "keyring", "tzdata": "tzdata"}
+           "pypdf": "pypdf", "PIL": "pillow", "pyautogui": "pyautogui", "pyperclip": "pyperclip", "keyring": "keyring", "tzdata": "tzdata", "qrcode": "qrcode"}
 if sys.platform in ("win32", "darwin"):
     modules["docx2pdf"] = "docx2pdf"
 print(f"Python {sys.version.split()[0]}")

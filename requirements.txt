@@ -12,3 +12,4 @@ pyperclip
 keyring
 docx2pdf
 tzdata
+qrcode
