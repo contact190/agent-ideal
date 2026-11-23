@@ -89,17 +89,48 @@ def appliquer(sha: str, prevenir=lambda t: None) -> str:
             cible.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, cible)
             n += 1
-    prevenir("🧩 Vérification des bibliothèques…")
-    try:
-        lignes = [l.strip() for l in (DOSSIER / "requirements.txt").read_text(encoding="utf-8").splitlines() if l.strip()]
-        for paquet in lignes:       # un par un : un échec n'empêche pas les autres
-            subprocess.run([_python_console(), "-m", "pip", "install", paquet, "--quiet", "--disable-pip-version-check"],
-                           capture_output=True, timeout=900, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except Exception as e:
-        config.journal(f"Mise à jour : bibliothèques : {e}")
+    installer_manquantes(prevenir)
     FICHIER_VERSION.write_text(sha, encoding="utf-8")
     config.journal(f"Mise à jour installée : {sha[:7]} ({n} fichiers)")
     return f"{n} fichiers mis à jour"
+
+
+# bibliothèque pip -> nom à importer ; les facultatives lourdes ne sont jamais installées par une mise à jour
+MODULES = {"anthropic": "anthropic", "google-api-python-client": "googleapiclient", "google-auth-oauthlib": "google_auth_oauthlib",
+           "google-auth-httplib2": "google_auth_httplib2", "openpyxl": "openpyxl", "python-docx": "docx", "reportlab": "reportlab",
+           "pypdf": "pypdf", "pillow": "PIL", "pyautogui": "pyautogui", "pyperclip": "pyperclip", "keyring": "keyring",
+           "docx2pdf": "docx2pdf", "tzdata": "tzdata", "qrcode": "qrcode"}
+FACULTATIVES_LOURDES = {"faster-whisper"}     # transcription sur le PC : plusieurs centaines de Mo
+
+
+def installer_manquantes(prevenir=lambda t: None, limite_s=300):
+    """Installe seulement les bibliothèques ABSENTES et légères, avec une limite de temps globale."""
+    import importlib.util
+    try:
+        paquets = [l.strip() for l in (DOSSIER / "requirements.txt").read_text(encoding="utf-8").splitlines() if l.strip()]
+    except Exception:
+        return
+    manquants = []
+    for paquet in paquets:
+        if paquet in FACULTATIVES_LOURDES:
+            continue
+        module = MODULES.get(paquet, paquet.replace("-", "_"))
+        if importlib.util.find_spec(module) is None:
+            manquants.append(paquet)
+    if not manquants:
+        return
+    prevenir(f"🧩 Installation de : {', '.join(manquants)}…")
+    debut = time.time()
+    for paquet in manquants:
+        reste = limite_s - (time.time() - debut)
+        if reste <= 10:
+            config.journal(f"Mise à jour : temps dépassé, {paquet} non installé")
+            break
+        try:
+            subprocess.run([_python_console(), "-m", "pip", "install", paquet, "--quiet", "--disable-pip-version-check"],
+                           capture_output=True, timeout=reste, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception as e:
+            config.journal(f"Mise à jour : {paquet} : {e}")
 
 
 def redemarrer(infos: dict = None):
