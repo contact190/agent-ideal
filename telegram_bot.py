@@ -627,9 +627,21 @@ class BotTelegram:
                 self.envoyer("Envoie : <code>/groq ta_clé</code> (elle commence par gsk_). "
                              "Crée-la gratuitement sur console.groq.com/keys → Create API Key.")
                 return
-            transcription.enregistrer_cle("groq", morceaux[1].strip())
-            self.envoyer("✅ Clé Groq enregistrée sur le PC (message effacé de la conversation). "
-                         "Envoie-moi un vocal pour essayer !")
+            cle = morceaux[1].strip()
+            if cle in ("gsk_ta_clé", "gsk_ta_cle") or len(cle) < 30:
+                self.envoyer("Ce n'est pas une vraie clé : remplace « gsk_ta_clé » par la clé copiée sur console.groq.com/keys "
+                             "(elle est longue, environ 56 caractères).")
+                return
+            erreur = transcription.verifier_cle_groq(cle)
+            if erreur and "refuse" in erreur:
+                self.envoyer("❌ " + html.escape(erreur) + " (message effacé de la conversation)")
+                return
+            transcription.enregistrer_cle("groq", cle)
+            if erreur:
+                self.envoyer("⚠️ Clé enregistrée, mais je n'ai pas pu la vérifier : " + html.escape(erreur))
+            else:
+                self.envoyer("✅ Clé Groq valide et enregistrée sur le PC (message effacé de la conversation). "
+                             "Envoie-moi un vocal pour essayer !")
         elif cmd == "/majour":
             import mise_a_jour
             try:

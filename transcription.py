@@ -67,6 +67,22 @@ def enregistrer_cle(fournisseur: str, cle: str):
         fichier.unlink()
 
 
+def verifier_cle_groq(cle: str) -> str:
+    """'' si la clé est acceptée par Groq, sinon un message d'erreur clair."""
+    req = urllib.request.Request("https://api.groq.com/openai/v1/models", headers={
+        "Authorization": f"Bearer {cle.strip()}", "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AgentIdeal/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=20):
+            return ""
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return "Groq refuse cette clé : elle est incomplète ou a été supprimée. Recopie-la entièrement depuis console.groq.com/keys."
+        return f"Groq a répondu {e.code} : {e.read().decode('utf-8', 'ignore')[:150]}"
+    except Exception as e:
+        return f"Groq injoignable depuis le PC ({e})."
+
+
 def local_disponible() -> bool:
     try:
         import faster_whisper  # noqa
