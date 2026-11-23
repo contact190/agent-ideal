@@ -20,7 +20,7 @@ Ouvre ton dossier **Téléchargements** et fais un **clic droit** sur `agent-ide
 
 ### 3. Installer
 
-Dans le dossier extrait `agent-ideal-main`, double-clique sur **`1_INSTALLER.bat`**.
+Ouvre le dossier extrait `agent-ideal-main` (parfois il y en a un second à l'intérieur : ouvre-le aussi) jusqu'à voir **`1_INSTALLER.bat`**, et double-clique dessus.
 
 - Si Windows affiche « Windows a protégé votre ordinateur », clique sur **Informations complémentaires**, puis **Exécuter quand même**.
 - Si Python n'est pas installé, il est installé automatiquement.
