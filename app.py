@@ -256,10 +256,21 @@ class Gestionnaire(BaseHTTPRequestHandler):
             jeton = (d.get("jeton") or "").strip()
             if not re.match(r"^\d+:[\w-]{30,}$", jeton):
                 return self._json({"ok": False, "erreur": "Ce n'est pas un jeton de bot (format 123456789:ABC…). Copie-le depuis @BotFather."})
-            try:
-                telegram_bot.verifier_jeton(jeton)
-            except Exception as e:
-                return self._json({"ok": False, "erreur": f"Jeton refusé par Telegram : {e}"})
+            erreur = ""
+            for essai in range(3):                       # connexion parfois lente : on réessaie
+                try:
+                    telegram_bot.verifier_jeton(jeton)
+                    erreur = ""
+                    break
+                except telegram_bot.ErreurTelegram as e:
+                    erreur = f"Jeton refusé par Telegram ({e}) : recopie-le depuis @BotFather."
+                    break
+                except Exception as e:
+                    erreur = ("Telegram est injoignable depuis ce PC (connexion lente ou bloquée). "
+                              f"Vérifie Internet puis réessaie dans un instant. Détail : {e}")
+                    time.sleep(2)
+            if erreur:
+                return self._json({"ok": False, "erreur": erreur})
             telegram_bot.enregistrer_jeton(jeton)
             bot.dissocier()
             bot.demarrer()
