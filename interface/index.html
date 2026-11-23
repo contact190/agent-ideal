@@ -182,6 +182,16 @@
     <div id="telNotif" style="display:none">
       <div class="interrupteur"><input type="checkbox" id="telToutSuivre"><span>M'envoyer aussi les réponses et questions des demandes faites depuis le PC</span></div>
       <div class="interrupteur"><input type="checkbox" id="telNotifTaches"><span>Me prévenir à la fin de chaque tâche automatique</span></div>
+      <label>🎙️ Messages vocaux</label>
+      <select id="vocMode">
+        <option value="auto">Automatique (Groq si une clé est enregistrée, sinon sur le PC)</option>
+        <option value="groq">Groq — le plus précis, darija compris (clé gratuite)</option>
+        <option value="local">Sur le PC — sans clé, plus lent</option>
+        <option value="openai">OpenAI (clé payante)</option>
+      </select>
+      <div class="aide">Clé Groq gratuite : <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> → Create API Key.</div>
+      <div class="ligne"><input id="vocCle" type="password" placeholder="Clé Groq (gsk_…)" autocomplete="off"><button id="btnVocCle">Enregistrer</button></div>
+      <div class="message-form" id="msgVoc"></div>
     </div>
     <div class="message-form" id="msgTel"></div>
   </div>
@@ -321,6 +331,7 @@ function remplirReglages(r){
   $("telNotifTaches").checked = r.telegram_notifier_taches !== false;
   $("telToutSuivre").checked = r.telegram_tout_suivre !== false;
   afficherTelegram(etat.telegram);
+  afficherVocal(etat.vocal);
 }
 async function rafraichir(premiere){
   etat = await api("/api/etat");
@@ -372,6 +383,16 @@ $("btnTelJeton").onclick = async () => {
   $("telJeton").value=""; afficherTelegram(r.telegram); afficherAppairage(r.appairage);
 };
 $("telNotifTaches").onchange = () => api("/api/reglages", {telegram_notifier_taches: $("telNotifTaches").checked});
+function afficherVocal(v){
+  if (!v) return; $("vocMode").value = v.mode;
+  const noms = {groq:"Groq", openai:"OpenAI", local:"sur le PC", aucun:"aucun"};
+  const m = $("msgVoc"); m.className = "message-form " + (v.effectif === "aucun" ? "ko" : "ok");
+  m.textContent = v.effectif === "aucun" ? "Vocaux pas encore possibles : ajoute une clé Groq (gratuite)." :
+    `Vocaux transcrits par : ${noms[v.effectif]}` + (v.cle_groq ? " · clé Groq enregistrée" : "") + (!v.local && v.effectif !== "local" ? "" : "");
+  $("vocCle").placeholder = v.cle_groq ? "•••••• (clé Groq enregistrée)" : "Clé Groq (gsk_…)";
+}
+$("vocMode").onchange = async () => { const r = await api("/api/vocal", {mode: $("vocMode").value}); afficherVocal(r.vocal); };
+$("btnVocCle").onclick = async () => { const r = await api("/api/vocal", {cle_groq: $("vocCle").value.trim()}); $("vocCle").value=""; afficherVocal(r.vocal); };
 $("telToutSuivre").onchange = () => api("/api/reglages", {telegram_tout_suivre: $("telToutSuivre").checked});
 
 // ---------- réglages

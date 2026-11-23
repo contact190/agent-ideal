@@ -16,6 +16,12 @@ for mod, paquet in modules.items():
     except Exception as e:
         print(f"  MANQUANT  {paquet}  ({type(e).__name__}: {e})")
         manquants.append(paquet)
+# facultatif : transcription des vocaux sur le PC (sinon : clé Groq gratuite)
+try:
+    importlib.import_module("faster_whisper")
+    print("  OK        faster-whisper (vocaux sur le PC)")
+except Exception:
+    print("  (facultatif) faster-whisper absent : les vocaux passeront par une clé Groq gratuite.")
 if manquants:
     print("\n❌ Installation incomplète. Manquant : " + ", ".join(manquants))
     print("Fais une capture de cette fenêtre et envoie-la.")

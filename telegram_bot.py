@@ -139,11 +139,21 @@ def decouper(texte: str, n=LIMITE):
     return morceaux
 
 
+# Clavier permanent en bas de Telegram : on commande sans rien taper
+CLAVIER = {"keyboard": [[{"text": "🖥️ Écran"}, {"text": "🕗 Tâches"}, {"text": "📊 État"}],
+                        [{"text": "⏹️ Stop"}, {"text": "🆕 Nouvelle"}, {"text": "❓ Aide"}]],
+           "resize_keyboard": True, "is_persistent": True,
+           "input_field_placeholder": "Écris ou enregistre un vocal…"}
+BOUTONS = {"🖥️ Écran": "/ecran", "🕗 Tâches": "/taches", "📊 État": "/etat",
+           "⏹️ Stop": "/stop", "🆕 Nouvelle": "/nouvelle", "❓ Aide": "/aide"}
+
 AIDE = (
     "🤖 <b>Agent Idéal</b> — écris-moi simplement ce que tu veux que je fasse sur ton PC.\n\n"
     "Exemples :\n• Fais le devis du client Benali et envoie-le-moi en PDF\n"
     "• Quels sont mes rendez-vous demain ?\n• Résume mes e-mails non lus\n\n"
-    "Tu peux aussi m'envoyer une photo ou un fichier : je le range sur le PC et je m'en sers.\n\n"
+    "🎙️ Tu peux aussi m'envoyer un <b>message vocal</b> (français, arabe ou darija) : je l'écris puis je l'exécute.\n"
+    "📎 Et une photo ou un fichier : je le range sur le PC et je m'en sers.\n\n"
+    "Les boutons en bas de l'écran te donnent les commandes rapides.\n\n"
     "Commandes :\n/ecran — capture de l'écran du PC\n/taches — tâches automatiques\n"
     "/etat — ce que fait l'agent\n/stop — arrêter le travail en cours\n/nouvelle — nouvelle conversation\n/aide — ce message"
 )
@@ -236,7 +246,7 @@ class BotTelegram:
 
     # ---------------- envoi
 
-    def envoyer(self, texte, html_ok=True, boutons=None, chat_id=None):
+    def envoyer(self, texte, html_ok=True, boutons=None, chat_id=None, clavier=False):
         chat = chat_id or self.chat_id
         if not (self.jeton and chat):
             return None
@@ -248,6 +258,8 @@ class BotTelegram:
                 donnees["parse_mode"] = "HTML"
             if boutons and i == len(morceaux) - 1:
                 donnees["reply_markup"] = {"inline_keyboard": boutons}
+            elif clavier and i == len(morceaux) - 1:
+                donnees["reply_markup"] = CLAVIER
             try:
                 dernier = appel(self.jeton, "sendMessage", donnees)
             except ErreurTelegram as e:
@@ -435,7 +447,7 @@ class BotTelegram:
                 nom = " ".join(x for x in (m["from"].get("first_name"), m["from"].get("last_name")) if x)
                 config.enregistrer_reglages({"telegram_chat_id": chat, "telegram_nom": nom})
                 self.code = None
-                self.envoyer(f"✅ Appairé ! Bonjour {html.escape(nom)}.\n\n" + AIDE, chat_id=chat)
+                self.envoyer(f"✅ Appairé ! Bonjour {html.escape(nom)}.\n\n" + AIDE, chat_id=chat, clavier=True)
                 self.bus.publier({"type": "telegram", "etat": self.etat()})
             else:
                 self.envoyer("Pour relier ce téléphone, ouvre les Réglages de l'Agent Idéal sur ton PC "
@@ -453,9 +465,10 @@ class BotTelegram:
         elif m.get("photo"):
             p = m["photo"][-1]
             piece = (p["file_id"], f"photo_{datetime.datetime.now():%Y%m%d_%H%M%S}.jpg")
-        elif m.get("voice") or m.get("audio"):
-            self.envoyer("🎙️ Je ne comprends pas encore les messages vocaux. Écris ta demande "
-                         "(astuce : le micro du clavier du téléphone transforme ta voix en texte).", html_ok=False)
+        elif m.get("voice") or m.get("audio") or m.get("video_note"):
+            v = m.get("voice") or m.get("audio") or m.get("video_note")
+            # transcription dans un fil à part : la réception (/stop…) reste disponible pendant ce temps
+            threading.Thread(target=self._vocal, args=(v["file_id"], v.get("file_name") or "vocal.ogg"), daemon=True).start()
             return
         if piece:
             chemin = self._enregistrer_piece(*piece)
@@ -463,6 +476,13 @@ class BotTelegram:
                 return
             texte = (texte + "\n\n" if texte else "Je t'envoie ce fichier depuis mon téléphone. ") + f"[Fichier reçu et enregistré : {chemin}]"
 
+        self._executer_texte(texte)
+
+    def _executer_texte(self, texte):
+        """Texte (tapé, bouton ou vocal transcrit) -> commande ou demande à l'agent."""
+        texte = (texte or "").strip()
+        if texte in BOUTONS:
+            texte = BOUTONS[texte]
         if texte.startswith("/"):
             self._commande(texte.split()[0].split("@")[0].lower())
             return
@@ -477,6 +497,31 @@ class BotTelegram:
         self._suivi = True
         self._msg_progression = None
         self.agent.envoyer(texte)
+
+    def _vocal(self, file_id, nom):
+        import transcription
+        try:
+            appel(self.jeton, "sendChatAction", {"chat_id": self.chat_id, "action": "typing"})
+        except Exception:
+            pass
+        try:
+            octets = telecharger(self.jeton, file_id)
+            texte = transcription.transcrire(octets, nom, prevenir=lambda t: self.envoyer(html.escape(t)))
+        except transcription.ErreurTranscription as e:
+            self.envoyer("🎙️ " + html.escape(str(e)))
+            return
+        except Exception as e:
+            self.envoyer(f"🎙️ Je n'ai pas pu lire ce vocal ({html.escape(type(e).__name__)} : {html.escape(str(e)[:200])}).")
+            return
+        if not texte:
+            self.envoyer("🎙️ Je n'ai rien entendu dans ce vocal. Réessaie en parlant plus près du micro.")
+            return
+        self.envoyer(f"🎙️ <i>J'ai compris :</i> « {html.escape(texte)} »")
+        # « stop », « écran »… dits à voix haute = commandes
+        simple = re.sub(r"[^\w ]", "", texte.lower()).strip()
+        dites = {"stop": "/stop", "arrête": "/stop", "arrete": "/stop", "écran": "/ecran", "ecran": "/ecran",
+                 "état": "/etat", "etat": "/etat", "tâches": "/taches", "taches": "/taches", "nouvelle conversation": "/nouvelle"}
+        self._executer_texte(dites.get(simple, texte))
 
     def _attend_reponse(self):
         """La dernière réponse de l'agent se termine-t-elle par une question ?"""
@@ -508,7 +553,7 @@ class BotTelegram:
     def _commande(self, cmd):
         import routines
         if cmd in ("/aide", "/help", "/start"):
-            self.envoyer(AIDE)
+            self.envoyer(AIDE, clavier=True)
         elif cmd == "/stop":
             self.agent.arreter()
             self.planificateur.arreter_en_cours()

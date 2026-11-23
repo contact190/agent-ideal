@@ -31,6 +31,7 @@ import agent as module_agent
 import navigateur
 import routines
 import telegram_bot
+import transcription
 from agent import Agent, Bus
 
 PORT_PREFERE = 8765
@@ -65,6 +66,7 @@ def etat_complet():
         "planificateur": planificateur.etat() if planificateur else {},
         "navigateurs": navigateur.disponibles(),
         "telegram": bot.etat() if bot else {},
+        "vocal": transcription.etat(),
     }
 
 
@@ -275,6 +277,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
             bot.dissocier()
             bot.demarrer()
             return self._json({"ok": True, "telegram": bot.etat(), "appairage": bot.nouveau_code()})
+        if chemin == "/api/vocal":
+            if "mode" in d:
+                config.enregistrer_reglages({"vocal_mode": d["mode"]})
+            for f in ("groq", "openai"):
+                if d.get(f"cle_{f}") is not None:
+                    transcription.enregistrer_cle(f, d[f"cle_{f}"])
+            return self._json({"ok": True, "vocal": transcription.etat()})
         if chemin == "/api/telegram/code":
             if not bot.jeton:
                 return self._json({"ok": False, "erreur": "Enregistre d'abord le jeton du bot."})

@@ -72,11 +72,14 @@ Tu peux suivre l'agent, valider ses actions et lui donner des ordres depuis ton 
 4. **Scanne le QR code** affiché avec le téléphone, puis appuie sur **Démarrer**. C'est relié.
 
 Ensuite, sur Telegram :
-- **Écris ta demande**, et l'agent la fait sur le PC puis te répond.
+- **Écris ta demande ou envoie un message vocal** en français, en arabe ou en darija. L'agent te montre ce qu'il a compris, le fait sur le PC, puis te répond.
+- Les **boutons en bas de Telegram** (Écran, Tâches, État, Stop, Nouvelle, Aide) servent de commandes rapides.
 - Quand l'agent veut envoyer un mail ou supprimer quelque chose, tu reçois les boutons **✅ Valider / ❌ Refuser**.
 - À la fin de chaque tâche automatique, tu reçois son compte-rendu.
 - Envoie une **photo ou un fichier** : il est rangé sur le PC, dans *Reçus Telegram*, et l'agent s'en sert.
 - Commandes : **/ecran** (capture du PC), **/taches**, **/etat**, **/stop**, **/nouvelle**.
+
+**Vocaux :** pour une transcription précise, darija compris, crée une **clé Groq gratuite** sur [console.groq.com/keys](https://console.groq.com/keys) (*Create API Key*, sans carte bancaire). Colle-la dans **⚙ Réglages → Téléphone → Messages vocaux**. Sans clé, la transcription se fait sur le PC : c'est plus lent, et un modèle d'environ 500 Mo est téléchargé la première fois.
 
 > Le bot ne répond qu'au téléphone que tu as relié. Le PC doit être allumé.
 

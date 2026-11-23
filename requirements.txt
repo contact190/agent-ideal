@@ -13,3 +13,4 @@ keyring
 docx2pdf
 tzdata
 qrcode
+faster-whisper
