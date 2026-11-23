@@ -33,6 +33,8 @@ COMMANDES = [
     {"command": "stop", "description": "Arrêter le travail en cours"},
     {"command": "nouvelle", "description": "Nouvelle conversation"},
     {"command": "majour", "description": "Mettre l'agent à jour"},
+    {"command": "vocal", "description": "Réglage des messages vocaux"},
+    {"command": "vocalpc", "description": "Installer la transcription des vocaux sur le PC"},
     {"command": "aide", "description": "Aide"},
 ]
 
@@ -541,7 +543,8 @@ class BotTelegram:
                 texte_err = ("Pour comprendre les vocaux, il me faut une clé Groq gratuite :\n"
                              "1. Ouvre console.groq.com/keys sur ton téléphone (connexion avec Google possible)\n"
                              "2. Create API Key → copie la clé (gsk_…)\n"
-                             "3. Envoie-moi : /groq ta_clé")
+                             "3. Envoie-moi : /groq ta_clé\n\n"
+                             "Ou, sans clé : /vocalpc installe la transcription directement sur le PC.")
             self.envoyer("🎙️ " + html.escape(texte_err))
             return
         except Exception as e:
@@ -615,6 +618,46 @@ class BotTelegram:
             except Exception:
                 pass
             self.envoyer("\n".join(html.escape(x) for x in lignes))
+        elif cmd == "/vocalpc":
+            import transcription
+            if transcription.local_disponible():
+                config.enregistrer_reglages({"vocal_mode": "local"})
+                self.envoyer("✅ La transcription sur le PC est déjà installée et activée. Envoie-moi un vocal !\n"
+                             "(Le premier vocal télécharge le modèle, ~500 Mo, une seule fois.)")
+                return
+            self.envoyer("⏳ J'installe la transcription des vocaux sur le PC (plusieurs centaines de Mo). "
+                         "Ça peut prendre 5 à 20 minutes selon la connexion du PC. Je te préviens quand c'est prêt.")
+
+            def installer():
+                import subprocess, sys
+                from pathlib import Path as _P
+                exe = _P(sys.executable)
+                py = str(exe.parent / "python.exe") if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").exists() else sys.executable
+                try:
+                    r = subprocess.run([py, "-m", "pip", "install", "faster-whisper", "--quiet", "--disable-pip-version-check"],
+                                       capture_output=True, text=True, timeout=3600,
+                                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                    import importlib
+                    importlib.invalidate_caches()
+                    if transcription.local_disponible():
+                        config.enregistrer_reglages({"vocal_mode": "local"})
+                        self.envoyer("✅ Transcription sur le PC installée et activée. Envoie-moi un vocal !\n"
+                                     "Le premier prendra plus de temps (téléchargement du modèle, ~500 Mo, une seule fois).")
+                    else:
+                        self.envoyer("❌ L'installation n'a pas abouti : " + html.escape((r.stderr or r.stdout or "")[-400:]))
+                except Exception as e:
+                    self.envoyer("❌ Installation impossible : " + html.escape(str(e)))
+            threading.Thread(target=installer, daemon=True).start()
+        elif cmd == "/vocal":
+            import transcription
+            morceaux = texte.split()
+            choix = morceaux[1].lower() if len(morceaux) > 1 else ""
+            if choix in ("auto", "groq", "local", "openai"):
+                config.enregistrer_reglages({"vocal_mode": choix})
+            e = transcription.etat()
+            self.envoyer(f"🎙️ Vocaux : mode <b>{e['mode']}</b> → transcrits par <b>{e['effectif']}</b>\n"
+                         f"Clé Groq : {'oui' if e['cle_groq'] else 'non'} · Transcription sur le PC : {'installée' if e['local'] else 'non installée (/vocalpc)'}\n\n"
+                         "Changer : /vocal groq · /vocal local · /vocal auto")
         elif cmd == "/groq":
             import transcription
             morceaux = texte.split(maxsplit=1)

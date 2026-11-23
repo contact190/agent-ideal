@@ -176,7 +176,12 @@ def transcrire(octets: bytes, nom: str = "vocal.ogg", prevenir=None) -> str:
     """Renvoie le texte du message vocal. prevenir(texte) sert à informer l'utilisateur d'une attente."""
     mode = mode_effectif()
     if mode in FOURNISSEURS:
-        return _en_ligne(mode, octets, nom)
+        try:
+            return _en_ligne(mode, octets, nom)
+        except ErreurTranscription:
+            if config.charger_reglages().get("vocal_mode", "auto") == "auto" and local_disponible():
+                return _local(octets, nom, prevenir)      # repli sur le PC
+            raise
     if mode == "local":
         return _local(octets, nom, prevenir)
     raise ErreurTranscription("Aucun moyen de transcrire les vocaux n'est configuré. Ajoute une clé Groq gratuite "
